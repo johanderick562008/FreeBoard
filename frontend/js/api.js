@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:8000";
+const API_BASE = "https://freeboard.onrender.com";
 
 async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
