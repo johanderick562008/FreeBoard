@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreeBoard</title>
+<link rel="icon" type="image/png" href="./logo.png?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="mark"><span class="dot"></span> FreeBoard</div>
+      <div class="sub" id="clockLine">— · —</div>
+    </div>
+    <div class="me" id="meBox"><!-- filled by JS --></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="live" class="active">🔴 Live Now</button>
+    <button data-tab="browse">📅 Browse</button>
+    <button data-tab="people">👥 People</button>
+    <button data-tab="together">🤝 Free Together</button>
+  </nav>
+
+  <section class="panel active" id="panel-live">
+    <div class="live-status-bar">
+      <span class="badge" id="liveBadge">—</span>
+      <div class="slotline" id="liveSlotLine">—</div>
+      <div class="count" id="liveCount"></div>
+    </div>
+    <h2 class="section-title" id="liveHeading">Free right now</h2>
+    <p class="section-sub">Among you and the people you've added.</p>
+    <div class="board" id="liveBoard"></div>
+    <div class="busy-strip">
+      <div class="lbl">In class right now</div>
+      <div class="chip-row" id="liveBusy"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-browse">
+    <h2 class="section-title">Browse any day &amp; period</h2>
+    <p class="section-sub">Pick a day and slot to see who's free.</p>
+    <div class="pillrow" id="browseDays"></div>
+    <div class="pillrow" id="browseSlots"></div>
+    <div class="split">
+      <div class="col free"><h3>✓ Free</h3><div class="chip-row" id="browseFree"></div></div>
+      <div class="col busy"><h3>✕ In class</h3><div class="chip-row" id="browseBusy"></div></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-people">
+    <h2 class="section-title">Your people</h2>
+    <p class="section-sub">Search a username to add them to your board, or manage your own timetable.</p>
+
+    <div class="addbar">
+      <input class="search-box" id="userSearch" placeholder="Search by username or name…">
+      <button class="btn primary" id="uploadBtn">📷 Upload my timetable</button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+
+    <div id="requestsBlock" style="display:none;">
+      <div class="example-label" style="margin-bottom:8px;">Requests waiting on you</div>
+      <div class="search-results" id="requestsList"></div>
+    </div>
+
+    <div class="people-grid" id="peopleGrid"></div>
+
+    <div class="detail" id="personDetail">
+      <div class="dhead"><h3 id="detailName">—</h3></div>
+      <div class="weekgrid"><table class="tt" id="detailTable"></table></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-together">
+    <h2 class="section-title">When is everyone free together?</h2>
+    <p class="section-sub">Pick 2+ people from your board.</p>
+    <div class="who-select" id="togetherSelect"></div>
+    <div class="together-results" id="togetherResults">
+      <div class="empty-note">Pick at least 2 people above.</div>
+    </div>
+  </section>
+
+  <div class="legend">
+    <div class="li"><span class="sw free"></span> Free period</div>
+    <div class="li"><span class="sw busy"></span> In class</div>
+  </div>
+</div>
+
+<!-- username setup (first login) -->
+<div class="modal-bg" id="usernameModalBg">
+  <div class="modal">
+    <h3>Pick your username</h3>
+    <p class="section-sub">This is how your friends will find you to add you to their board.</p>
+    <input class="search-box" id="usernameInput" placeholder="e.g. johan_cse" style="margin-bottom:12px;">
+    <button class="btn primary" id="usernameSaveBtn">Save &amp; continue</button>
+    <div id="usernameError" style="color:var(--busy);font-size:12.5px;margin-top:8px;"></div>
+  </div>
+</div>
+
+<!-- timetable upload / review -->
+<div class="modal-bg" id="uploadModalBg">
+  <div class="modal">
+    <h3>Upload your timetable</h3>
+    <p class="section-sub" id="uploadStepText">Upload a clear photo of your timetable. We'll pre-fill the grid — you confirm or fix anything before it saves.</p>
+    <div class="example-block" id="exampleBlock">
+      <div class="example-label">Example timetable</div>
+      <img src="assets/example-timetable.png" alt="Example of a timetable that works well with FreeBoard OCR" class="example-img">
+      <div class="example-caption">A straight-on, tightly-cropped, well-lit photo like this works best.</div>
+    </div>
+
+    <div class="dropzone" id="dropzone">Click to choose a photo (JPG/PNG, under 5MB)</div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none;">
+    <div id="reviewArea" style="margin-top:16px;"></div>
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn ghost" id="skipUploadBtn">Fill in manually instead</button>
+      <button class="btn primary" id="saveTimetableBtn" style="display:none;">Save timetable</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit my own name -->
+<div class="modal-bg" id="editNameModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Edit your name</h3>
+      <button class="modal-close" id="editNameCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <p class="section-sub">Only you can change this — it's how you appear to everyone.</p>
+    <input class="search-box" id="editNameInput" maxlength="100" style="margin-bottom:6px;">
+    <div class="modal-error" id="editNameError"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="editNameCancelBtn">Cancel</button>
+      <button class="btn primary" id="editNameSaveBtn">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- edit a friend's private nickname -->
+<div class="modal-bg" id="editNicknameModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Edit person's name</h3>
+      <button class="modal-close" id="editNicknameCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <p class="section-sub">Actual name: <b id="nicknameRealName">—</b></p>
+    <label class="modal-label">Your nickname for them</label>
+    <input class="search-box" id="editNicknameInput" maxlength="100" placeholder="e.g. Bro" style="margin-bottom:6px;">
+    <p class="modal-hint">This nickname is only visible to you.</p>
+    <div class="modal-error" id="editNicknameError"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="editNicknameCancelBtn">Cancel</button>
+      <button class="btn primary" id="editNicknameSaveBtn">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- remove person confirmation -->
+<div class="modal-bg" id="removePersonModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Remove person?</h3>
+      <button class="modal-close" id="removePersonCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <p class="section-sub" id="removePersonText">Are you sure you want to remove them from your People list?</p>
+    <div class="modal-error" id="removePersonError"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="removePersonCancelBtn">Cancel</button>
+      <button class="btn danger" id="removePersonConfirmBtn">Remove</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Saved</div>
+
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
