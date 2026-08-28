@@ -43,8 +43,8 @@ def set_session_cookie(response, token: str):
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=settings.ENV != "development",  # Secure requires HTTPS — off only for local dev
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=settings.JWT_EXPIRE_MINUTES * 60,
         path="/",
     )
