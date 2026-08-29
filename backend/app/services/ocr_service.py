@@ -27,6 +27,7 @@ hard failure.
 """
 
 import re
+import os
 from io import BytesIO
 from typing import List, Optional, Tuple, Dict
 
@@ -36,10 +37,14 @@ import pytesseract
 from pytesseract import Output
 from PIL import Image, ImageOps
 
+
 from ..schemas import OcrReviewCell
 
-# Windows Tesseract path (kept from the working local setup)
-pytesseract.pytesseract.tesseract_cmd = (r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+
+if os.name == "nt":
+    pytesseract.pytesseract.tesseract_cmd = (
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    )
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 DAY_HINTS = {"mon": "Monday", "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday", "fri": "Friday"}
