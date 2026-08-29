@@ -27,7 +27,7 @@ hard failure.
 """
 
 import re
-import os
+import platform
 from io import BytesIO
 from typing import List, Optional, Tuple, Dict
 
@@ -37,14 +37,13 @@ import pytesseract
 from pytesseract import Output
 from PIL import Image, ImageOps
 
-
 from ..schemas import OcrReviewCell
 
-
-if os.name == "nt":
-    pytesseract.pytesseract.tesseract_cmd = (
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    )
+# Windows Tesseract path (kept from the working local setup) — only applies on
+# Windows. On Linux (Render, or any other Linux host) pytesseract instead finds
+# the "tesseract" binary via the system PATH, which is where apt installs it.
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = (r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 DAY_HINTS = {"mon": "Monday", "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday", "fri": "Friday"}
