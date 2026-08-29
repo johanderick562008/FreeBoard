@@ -64,10 +64,20 @@ def _normalize(label: str, confidence: float) -> Tuple[str, float]:
 
 # ---------------------------------------------------------------- image prep
 
+MAX_DIMENSION = 1800  # phone photos are often 3000-4000px wide — way more than OCR needs
+
+
 def _load_gray(raw_bytes: bytes) -> np.ndarray:
     image = Image.open(BytesIO(raw_bytes))
     image = ImageOps.exif_transpose(image)   # respect camera rotation
     image.info.pop("exif", None)             # strip metadata before further processing
+
+    # Downscale huge photos before any processing — grid-line detection doesn't need
+    # full resolution, and every per-cell OCR call gets its own 2x upscale anyway,
+    # so this cuts total processing time substantially without hurting accuracy.
+    if max(image.size) > MAX_DIMENSION:
+        image.thumbnail((MAX_DIMENSION, MAX_DIMENSION), Image.LANCZOS)
+
     return np.array(ImageOps.grayscale(image))
 
 
