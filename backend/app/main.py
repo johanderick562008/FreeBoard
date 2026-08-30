@@ -7,12 +7,12 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from .config import settings
-from .database import Base, engine
+#from .database import Base, engine
 from .routers import auth, users, timetable, schedule
 
 # Creates tables if they don't exist yet — schema.sql is the source of truth for
 # production migrations, this is just a dev-convenience fallback.
-Base.metadata.create_all(bind=engine)
+#Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="FreeBoard API")
 

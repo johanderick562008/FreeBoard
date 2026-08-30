@@ -27,7 +27,7 @@ CREATE TABLE timetable_entries (
   CONSTRAINT fk_tt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- "owner adds other to their board" — People/Together only show accounts you've added
+-- "owner sends a request to other" — only becomes visible on owner's board once other accepts
 CREATE TABLE connections (
   id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   owner_user_id  BIGINT UNSIGNED NOT NULL,
@@ -41,3 +41,13 @@ CREATE TABLE connections (
   CONSTRAINT chk_not_self CHECK (owner_user_id <> other_user_id)
 ) ENGINE=InnoDB;
 
+-- ============================================================
+-- MIGRATION — run this instead of the CREATE TABLE above if you
+-- already have a live database with existing connections rows.
+-- Existing rows are marked 'accepted' so nobody already on your
+-- board disappears.
+-- ============================================================
+-- ALTER TABLE connections
+--   ADD COLUMN status ENUM('pending','accepted','declined') NOT NULL DEFAULT 'accepted',
+--   ADD COLUMN nickname VARCHAR(100) DEFAULT NULL;
+-- ALTER TABLE connections ALTER COLUMN status SET DEFAULT 'pending';

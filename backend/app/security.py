@@ -39,12 +39,16 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 
 def set_session_cookie(response, token: str):
+    is_prod = settings.ENV != "development"
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=is_prod,          # Secure requires HTTPS — off only for local dev
+        # Frontend and backend live on different domains once hosted, so the cookie
+        # needs SameSite=None to be sent on those cross-site fetch() calls. None
+        # requires Secure, which is why this is only safe to flip in production.
+        samesite="none" if is_prod else "lax",
         max_age=settings.JWT_EXPIRE_MINUTES * 60,
         path="/",
     )

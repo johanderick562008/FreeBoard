@@ -49,7 +49,6 @@ class Connection(Base):
     owner_user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     other_user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(Enum("pending", "accepted", "declined", name="connection_status_enum"),
-                         nullable=False, default="pending")
+                     nullable=False, default="pending")
     nickname = Column(String(100), nullable=True)  # owner's private label for other_user, only owner sees it
     created_at = Column(DateTime, server_default=func.now())
-    

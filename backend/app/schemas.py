@@ -36,17 +36,6 @@ class TimetableBulkUpdate(BaseModel):
     cells: List[TimetableCell]
 
 
-class OcrReviewCell(BaseModel):
-    day: str
-    slot_index: int
-    guessed_label: str
-    confidence: float  # 0..1 — frontend flags low-confidence cells for the user to check
-
-
-class OcrReviewResult(BaseModel):
-    cells: List[OcrReviewCell]
-    note: str
-
 class DisplayNameUpdate(BaseModel):
     display_name: str = Field(min_length=1, max_length=100)
 

@@ -1,36 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import User, TimetableEntry, Connection
-from ..schemas import TimetableBulkUpdate, OcrReviewResult
+from ..schemas import TimetableBulkUpdate
 from ..security import get_current_user
-from ..services.ocr_service import extract_grid_from_image
 
 router = APIRouter(prefix="/timetable", tags=["timetable"])
-
-ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
-
-
-@router.post("/upload-preview", response_model=OcrReviewResult)
-async def upload_preview(file: UploadFile = File(...), user: User = Depends(get_current_user)):
-    """Runs OCR and returns a best-guess grid. Nothing is saved yet — the user
-    reviews/edits this on the frontend, then calls /timetable/bulk to save."""
-    if file.content_type not in ALLOWED_TYPES:
-        raise HTTPException(status_code=400, detail="Please upload a JPG, PNG, or WEBP image.")
-    raw = await file.read()
-    try:
-        cells = extract_grid_from_image(raw)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    low_conf = sum(1 for c in cells if c.confidence < 0.5)
-    note = (
-        "We couldn't read this clearly — please fill in the highlighted cells by hand."
-        if low_conf > len(cells) / 2
-        else "Pre-filled from your photo — please check each cell before saving."
-    )
-    return OcrReviewResult(cells=cells, note=note)
 
 
 @router.put("/bulk")
