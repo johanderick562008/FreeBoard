@@ -24,9 +24,9 @@
       <div class="login-footnote">No password to remember — you're identified only by your Google account.</div>
     </div>
   </div>
-  <script>
+<script>
   // Points at your FastAPI backend
-  const API_BASE = "https://freeboard-1.onrender.com";
+  const API_BASE = "http://localhost:8000";
   document.getElementById('googleBtn').href = `${API_BASE}/auth/google/login`;
 </script>
 </body>

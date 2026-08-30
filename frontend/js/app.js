@@ -14,7 +14,6 @@ let me = null;
 let board = [];          // my connections + me
 let selectedDay = null, selectedSlot = null, selectedPersonId = null;
 let togetherPicked = new Set();
-let pendingReviewCells = null; // OCR review grid awaiting save
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -53,7 +52,7 @@ async function boot(){
   tickClock(); setInterval(tickClock, 1000);
   setInterval(loadLive, 20000);
 
-  wireTabs(); wirePeople(); wireUpload(); wireUsernameModal();
+  wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
   wireNameModal(); wireNicknameModal(); wireRemoveModal();
 
   const now = new Date();
@@ -406,6 +405,8 @@ function renderPeopleGrid(){
   });
 }
 
+let selectedCells = new Set(); // "day|slotIdx" keys, only used for my own timetable
+
 async function renderDetail(){
   const wrap = document.getElementById('personDetail');
   if (!selectedPersonId){ wrap.classList.remove('show'); return; }
@@ -418,6 +419,15 @@ async function renderDetail(){
   entries.forEach(e=>{ map[`${e.day}|${e.slot_index}`] = e; });
   const isMine = selectedPersonId === me.id;
 
+  const toolbar = document.getElementById('builderToolbar');
+  toolbar.style.display = isMine ? '' : 'none';
+
+  if (isMine){
+    // subject suggestions from what's already on the timetable, for the "or select" part
+    const subjects = [...new Set(entries.map(e=>e.label).filter(l=>l && l!=='Free' && l!=='Not set'))];
+    document.getElementById('subjectSuggestions').innerHTML = subjects.map(s=>`<option value="${s}">`).join('');
+  }
+
   let thead = '<tr><th>Day</th>' + SLOTS.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
   let rows = DAYS.map(day=>{
     const cells = SLOTS.map((s,i)=>{
@@ -425,8 +435,10 @@ async function renderDetail(){
       const label = e ? e.label : 'Not set';
       const isFree = e ? e.is_free : false;
       const cls = isFree ? 'free' : 'busy';
+      const key = `${day}|${i}`;
       if (isMine){
-        return `<td class="cell ${cls}"><input class="editcell" data-day="${day}" data-idx="${i}" value="${label==='Not set'?'':label}" placeholder="Class"></td>`;
+        const sel = selectedCells.has(key) ? ' sel-cell' : '';
+        return `<td class="cell ${cls}${sel}" data-day="${day}" data-idx="${i}" data-label="${label==='Not set'?'':label}">${label}</td>`;
       }
       return `<td class="cell ${cls}">${label}</td>`;
     }).join('');
@@ -434,16 +446,70 @@ async function renderDetail(){
   }).join('');
   document.getElementById('detailTable').innerHTML = thead + rows;
 
-  if (isMine){
-    document.querySelectorAll('#detailTable input.editcell').forEach(inp=>{
-      inp.addEventListener('change', async ()=>{
-        const label = inp.value.trim() || 'Class';
-        await Api.saveTimetable([{ day: inp.dataset.day, slot_index: parseInt(inp.dataset.idx), label }]);
-        showToast('Saved');
-        await renderDetail(); loadLive(); loadBrowse();
-      });
+  if (isMine) wireBuilderCells();
+  updateSelectionCount();
+}
+
+function wireBuilderCells(){
+  document.querySelectorAll('#detailTable td.cell[data-day]').forEach(td=>{
+    td.onclick = ()=>{
+      const key = `${td.dataset.day}|${td.dataset.idx}`;
+      const turningOn = !selectedCells.has(key);
+      if (turningOn){
+        selectedCells.add(key);
+        if (selectedCells.size === 1){
+          document.getElementById('subjectInput').value = td.dataset.label || '';
+        }
+      } else {
+        selectedCells.delete(key);
+      }
+      td.classList.toggle('sel-cell', turningOn);
+      updateSelectionCount();
+    };
+  });
+}
+
+function updateSelectionCount(){
+  const el = document.getElementById('selectionCount');
+  if (!el) return;
+  const n = selectedCells.size;
+  el.textContent = n === 0 ? 'Tap cells to select' : `${n} slot${n>1?'s':''} selected`;
+}
+
+function wireBuilderToolbar(){
+  const subjectInput = document.getElementById('subjectInput');
+
+  const applySelection = async (forcedLabel)=>{
+    if (selectedCells.size === 0){ showToast('Select at least one slot first'); return; }
+    const label = (forcedLabel !== undefined ? forcedLabel : subjectInput.value.trim());
+    const cells = [...selectedCells].map(key=>{
+      const [day, slot_index] = key.split('|');
+      return { day, slot_index: parseInt(slot_index), label };
     });
-  }
+    document.getElementById('applyBtn').disabled = true;
+    try{
+      await Api.saveTimetable(cells);
+      selectedCells.clear();
+      subjectInput.value = '';
+      showToast('Saved');
+      await renderDetail();
+      loadLive(); loadBrowse(); renderTogetherResults();
+    }catch(e){
+      showToast(e.message);
+    }finally{
+      document.getElementById('applyBtn').disabled = false;
+    }
+  };
+
+  document.getElementById('applyBtn').onclick = ()=> applySelection();
+  document.getElementById('markFreeBtn').onclick = ()=> applySelection('Free');
+  document.getElementById('clearSelectionBtn').onclick = ()=>{
+    selectedCells.clear();
+    subjectInput.value = '';
+    document.querySelectorAll('#detailTable td.cell.sel-cell').forEach(td=>td.classList.remove('sel-cell'));
+    updateSelectionCount();
+  };
+  subjectInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') applySelection(); });
 }
 
 /* ---------------- TOGETHER ---------------- */
@@ -487,71 +553,5 @@ function wireUsernameModal(){
   };
 }
 
-/* ---------------- TIMETABLE UPLOAD ---------------- */
-function wireUpload(){
-  const bg = document.getElementById('uploadModalBg');
-  document.getElementById('uploadBtn').onclick = ()=>{
-    document.getElementById('exampleBlock').style.display = '';
-    bg.classList.add('show');
-  };
-  bg.addEventListener('click', (e)=>{ if (e.target === bg) bg.classList.remove('show'); });
-
-  document.getElementById('skipUploadBtn').onclick = async ()=>{
-    bg.classList.remove('show');
-    selectedPersonId = me.id;
-    renderPeopleGrid();
-    await renderDetail();
-  };
-
-  const dropzone = document.getElementById('dropzone');
-  const fileInput = document.getElementById('fileInput');
-  dropzone.onclick = ()=> fileInput.click();
-  fileInput.onchange = async ()=>{
-    const file = fileInput.files[0];
-    if (!file) return;
-    document.getElementById('exampleBlock').style.display = 'none';
-    dropzone.textContent = 'Reading your timetable…';
-    try{
-      const result = await Api.uploadPreview(file);
-      pendingReviewCells = result.cells;
-      renderReview(result);
-    }catch(e){
-      dropzone.textContent = 'Could not read that image — try another, or fill in manually.';
-    }
-  };
-
-  document.getElementById('saveTimetableBtn').onclick = async ()=>{
-    const inputs = document.querySelectorAll('#reviewArea input.editcell');
-    const cells = Array.from(inputs).map(inp=>({
-      day: inp.dataset.day, slot_index: parseInt(inp.dataset.idx), label: inp.value.trim() || 'Class',
-    }));
-    await Api.saveTimetable(cells);
-    showToast('Timetable saved');
-    document.getElementById('uploadModalBg').classList.remove('show');
-    selectedPersonId = me.id;
-    renderPeopleGrid(); await renderDetail(); loadLive(); loadBrowse();
-  };
-}
-
-function renderReview(result){
-  document.getElementById('uploadStepText').textContent = result.note;
-  document.getElementById('dropzone').style.display = 'none';
-  document.getElementById('saveTimetableBtn').style.display = 'inline-block';
-
-  const byDay = {};
-  result.cells.forEach(c=>{ (byDay[c.day] ||= [])[c.slot_index] = c; });
-
-  let thead = '<tr><th>Day</th>' + SLOTS.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
-  let rows = DAYS.map(day=>{
-    const cells = SLOTS.map((s,i)=>{
-      const c = (byDay[day]||[])[i] || { guessed_label:'Class', confidence:0 };
-      const lowconf = c.confidence < 0.5 ? 'lowconf' : '';
-      return `<td class="cell ${lowconf}"><input class="editcell" data-day="${day}" data-idx="${i}" value="${c.guessed_label}"></td>`;
-    }).join('');
-    return `<tr><td class="day">${day}</td>${cells}</tr>`;
-  }).join('');
-
-  document.getElementById('reviewArea').innerHTML = `<div class="weekgrid"><table class="tt">${thead}${rows}</table></div>`;
-}
 
 boot();

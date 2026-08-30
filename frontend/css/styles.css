@@ -216,3 +216,25 @@ table.tt td.cell.lowconf{outline:2px solid var(--busy);}
 @media (max-width:480px){
   .made-by{left:10px;bottom:10px;padding:6px 10px;font-size:10.5px;}
 }
+
+/* Manual timetable builder: multi-select cells + apply toolbar (replaces OCR upload) */
+.builder-toolbar{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  background:var(--panel-2);border:1px solid var(--line-soft);border-radius:12px;
+  padding:12px;margin-bottom:14px;
+}
+.builder-toolbar .search-box{flex:1;min-width:200px;margin-bottom:0;}
+.builder-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.builder-hint{
+  width:100%;font-family:var(--font-mono);font-size:11.5px;color:var(--mint);
+}
+table.tt td.cell[data-day]{cursor:pointer;user-select:none;transition:outline .12s ease;}
+table.tt td.cell[data-day]:hover{outline:1px solid var(--line);}
+table.tt td.cell.sel-cell{
+  outline:2px solid var(--free) !important;
+  background:rgba(255,210,63,.18) !important;
+  color:var(--free);font-weight:600;
+}
+@media (max-width:480px){
+  table.tt th, table.tt td{padding:10px 6px;font-size:12.5px;} /* bigger tap targets on mobile */
+}

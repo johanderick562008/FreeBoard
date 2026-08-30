@@ -58,7 +58,6 @@
 
     <div class="addbar">
       <input class="search-box" id="userSearch" placeholder="Search by username or name…">
-      <button class="btn primary" id="uploadBtn">📷 Upload my timetable</button>
     </div>
     <div class="search-results" id="searchResults"></div>
 
@@ -71,6 +70,18 @@
 
     <div class="detail" id="personDetail">
       <div class="dhead"><h3 id="detailName">—</h3></div>
+
+      <div class="builder-toolbar" id="builderToolbar" style="display:none;">
+        <input class="search-box" id="subjectInput" placeholder="Subject or professor — or type Free" list="subjectSuggestions">
+        <datalist id="subjectSuggestions"></datalist>
+        <div class="builder-actions">
+          <button class="btn primary" id="applyBtn">Apply to selected</button>
+          <button class="btn ghost" id="markFreeBtn">Mark Free</button>
+          <button class="btn ghost" id="clearSelectionBtn">Clear</button>
+        </div>
+        <div class="builder-hint" id="selectionCount">Tap cells to select</div>
+      </div>
+
       <div class="weekgrid"><table class="tt" id="detailTable"></table></div>
     </div>
   </section>
@@ -101,26 +112,6 @@
   </div>
 </div>
 
-<!-- timetable upload / review -->
-<div class="modal-bg" id="uploadModalBg">
-  <div class="modal">
-    <h3>Upload your timetable</h3>
-    <p class="section-sub" id="uploadStepText">Upload a clear photo of your timetable. We'll pre-fill the grid — you confirm or fix anything before it saves.</p>
-    <div class="example-block" id="exampleBlock">
-      <div class="example-label">Example timetable</div>
-      <img src="assets/example-timetable.png" alt="Example of a timetable that works well with FreeBoard OCR" class="example-img">
-      <div class="example-caption">A straight-on, tightly-cropped, well-lit photo like this works best.</div>
-    </div>
-
-    <div class="dropzone" id="dropzone">Click to choose a photo (JPG/PNG, under 5MB)</div>
-    <input type="file" id="fileInput" accept="image/*" style="display:none;">
-    <div id="reviewArea" style="margin-top:16px;"></div>
-    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
-      <button class="btn ghost" id="skipUploadBtn">Fill in manually instead</button>
-      <button class="btn primary" id="saveTimetableBtn" style="display:none;">Save timetable</button>
-    </div>
-  </div>
-</div>
 
 <!-- edit my own name -->
 <div class="modal-bg" id="editNameModalBg">
@@ -178,7 +169,7 @@
 
 <div class="made-by">
   <span class="made-by-dot"></span>
-  <span>Made by <b>@Johan_Derick</b></span>
+  <span>Made by <b>@johan</b></span>
 </div>
 
 <script src="js/api.js"></script>
