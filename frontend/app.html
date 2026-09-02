@@ -16,13 +16,7 @@
       <div class="mark"><span class="dot"></span> FreeBoard</div>
       <div class="sub" id="clockLine">— · —</div>
     </div>
-    <div style="display:flex;align-items:center;gap:14px;">
-      <button class="bell-btn" id="requestsBellBtn" title="Requests">
-        🔔
-        <span class="bell-badge" id="bellBadge" style="display:none;">0</span>
-      </button>
-      <div class="me" id="meBox"><!-- filled by JS --></div>
-    </div>
+    <div class="me" id="meBox"><!-- filled by JS --></div>
   </header>
 
   <nav class="tabs">
@@ -30,7 +24,6 @@
     <button data-tab="browse">📅 Browse</button>
     <button data-tab="people">👥 People</button>
     <button data-tab="together">🤝 Free Together</button>
-    <button data-tab="groups">🗂️ Groups</button>
   </nav>
 
   <section class="panel active" id="panel-live">
@@ -99,48 +92,6 @@
     <div class="who-select" id="togetherSelect"></div>
     <div class="together-results" id="togetherResults">
       <div class="empty-note">Pick at least 2 people above.</div>
-    </div>
-  </section>
-
-  <section class="panel" id="panel-groups">
-    <h2 class="section-title">Your groups</h2>
-    <p class="section-sub">Roommates, class friends, whoever — everyone in a group can see everyone else's free time.</p>
-
-    <div class="addbar">
-      <input class="search-box" id="newGroupName" placeholder="New group name — e.g. Roommates">
-      <button class="btn primary" id="createGroupBtn">+ Create group</button>
-    </div>
-
-    <div id="groupInvitesBlock" style="display:none;">
-      <div class="example-label" style="margin-bottom:8px;">Group invites waiting on you</div>
-      <div class="search-results" id="groupInvitesList"></div>
-    </div>
-
-    <div class="people-grid" id="groupsGrid"></div>
-
-    <div class="detail" id="groupDetail">
-      <div class="dhead">
-        <h3 id="groupDetailName">—</h3>
-        <div style="display:flex;gap:8px;">
-          <button class="btn ghost" id="leaveGroupBtn">Leave group</button>
-          <button class="btn danger" id="deleteGroupBtn" style="display:none;">Delete group</button>
-        </div>
-      </div>
-
-      <div class="addbar">
-        <input class="search-box" id="groupInviteSearch" placeholder="Invite by username or name…">
-      </div>
-      <div class="search-results" id="groupInviteResults"></div>
-
-      <div class="pillrow" id="groupDays"></div>
-      <div class="pillrow" id="groupSlots"></div>
-      <div class="split">
-        <div class="col free"><h3>✓ Free</h3><div class="chip-row" id="groupFree"></div></div>
-        <div class="col busy"><h3>✕ In class</h3><div class="chip-row" id="groupBusy"></div></div>
-      </div>
-
-      <div class="lbl" style="margin-top:18px;">Members</div>
-      <div class="chip-row" id="groupMembersList"></div>
     </div>
   </section>
 
@@ -218,7 +169,7 @@
 
 <div class="made-by">
   <span class="made-by-dot"></span>
-  <span>Devoloped by <b>@Johan_Derick</b></span>
+  <span>Made by <b>@Johan_Derick</b></span>
 </div>
 
 <script src="js/api.js"></script>
