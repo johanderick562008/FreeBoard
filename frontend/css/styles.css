@@ -238,33 +238,3 @@ table.tt td.cell.sel-cell{
 @media (max-width:480px){
   table.tt th, table.tt td{padding:10px 6px;font-size:12.5px;} /* bigger tap targets on mobile */
 }
-
-/* Notification bell for incoming requests, header top-right */
-.bell-btn{
-  position:relative;background:var(--panel);border:1px solid var(--line);
-  border-radius:10px;width:38px;height:38px;font-size:16px;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  transition:border-color .15s ease, transform .15s ease;
-}
-.bell-btn:hover{border-color:var(--free);transform:translateY(-1px);}
-.bell-badge{
-  position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;
-  background:var(--busy);color:#fff;border-radius:999px;
-  font-family:var(--font-mono);font-size:10.5px;font-weight:700;
-  display:flex;align-items:center;justify-content:center;
-  border:2px solid var(--black);
-}
-
-/* Groups tab */
-.lbl{font-size:11px;color:var(--mint);text-transform:uppercase;font-family:var(--font-mono);letter-spacing:.4px;}
-.group-card-wrap{position:relative;}
-.group-card-wrap .person-btn{width:100%;}
-.group-card-meta{
-  position:absolute;bottom:5px;right:8px;font-family:var(--font-mono);
-  font-size:10px;color:rgba(0,0,0,.55);
-}
-.member-chip{display:inline-flex;align-items:center;gap:6px;}
-.member-chip .owner-tag{font-size:9.5px;color:var(--free);font-family:var(--font-mono);}
-.member-chip button{
-  background:none;border:none;color:var(--busy);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;
-}
