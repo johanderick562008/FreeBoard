@@ -1,4 +1,4 @@
-const API_BASE= "https://free-board-ashen.vercel.app";
+const API_BASE = "https://free-board-ashen.vercel.app";
 
 async function api(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -45,15 +45,4 @@ const Api = {
   saveTimetable: (cells) => api("/timetable/bulk", { method: "PUT", body: JSON.stringify({ cells }) }),
   live: (day, slotIndex) => api(`/schedule/live?day=${day}&slot_index=${slotIndex}`),
   together: (ids) => api(`/schedule/together?user_ids=${ids.join(",")}`),
-
-  createGroup: (name) => api("/groups", { method: "POST", body: JSON.stringify({ name }) }),
-  listGroups: () => api("/groups"),
-  groupMembers: (groupId) => api(`/groups/${groupId}/members`),
-  inviteToGroup: (groupId, userId) => api(`/groups/${groupId}/invite`, { method: "POST", body: JSON.stringify({ user_id: userId }) }),
-  groupInvites: () => api("/groups/invites"),
-  acceptGroupInvite: (memberId) => api(`/groups/invites/${memberId}/accept`, { method: "POST" }),
-  declineGroupInvite: (memberId) => api(`/groups/invites/${memberId}/decline`, { method: "POST" }),
-  leaveGroup: (groupId, userId) => api(`/groups/${groupId}/members/${userId}`, { method: "DELETE" }),
-  deleteGroup: (groupId) => api(`/groups/${groupId}`, { method: "DELETE" }),
-  groupLive: (groupId, day, slotIndex) => api(`/groups/${groupId}/schedule/live?day=${day}&slot_index=${slotIndex}`),
 };
