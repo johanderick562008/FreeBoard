@@ -38,6 +38,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(timetable.router)
 app.include_router(schedule.router)
+app.include_router(groups.router)
 
 
 @app.get("/health")
