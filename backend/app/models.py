@@ -52,26 +52,3 @@ class Connection(Base):
                      nullable=False, default="pending")
     nickname = Column(String(100), nullable=True)  # owner's private label for other_user, only owner sees it
     created_at = Column(DateTime, server_default=func.now())
-
-
-class Group(Base):
-    """A named group (e.g. 'Roommates', 'Class Friends') — membership grants MUTUAL
-    visibility, unlike Connection which is one-directional."""
-    __tablename__ = "groups"
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    name = Column(String(60), nullable=False)
-    owner_user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-
-
-class GroupMember(Base):
-    __tablename__ = "group_members"
-    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uniq_group_member"),)
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    group_id = Column(BigInteger, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    status = Column(Enum("pending", "accepted", "declined", name="group_member_status_enum"),
-                     nullable=False, default="pending")
-    joined_at = Column(DateTime, server_default=func.now())
