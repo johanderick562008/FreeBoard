@@ -59,7 +59,7 @@ class ConnectionOut(BaseModel):
     user: UserOut
     nickname: Optional[str] = None
 
-    class GroupCreate(BaseModel):
+class GroupCreate(BaseModel):
     name: str = Field(min_length=1, max_length=60)
 
 
