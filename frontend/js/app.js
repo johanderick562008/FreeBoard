@@ -51,9 +51,8 @@ async function boot(){
 
   tickClock(); setInterval(tickClock, 1000);
   setInterval(loadLive, 20000);
-  setInterval(loadIncomingRequests, 30000);
 
-  wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal(); wireBell(); wireGroupsTab();
+  wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
   wireNameModal(); wireNicknameModal(); wireRemoveModal();
 
   const now = new Date();
@@ -258,7 +257,6 @@ function wireTabs(){
       btn.classList.add('active');
       document.getElementById('panel-'+btn.dataset.tab).classList.add('active');
       if (btn.dataset.tab === 'people') loadIncomingRequests();
-      if (btn.dataset.tab === 'groups') loadGroups();
     };
   });
 }
@@ -328,22 +326,15 @@ function wirePeople(){
       const results = document.getElementById('searchResults');
       if (q.length < 2){ results.innerHTML=''; return; }
       const users = await Api.searchUsers(q);
-      results.innerHTML = users.map(u=>{
-        const isPending = u.request_status === 'pending';
-        const isAccepted = u.request_status === 'accepted';
-        const label = isAccepted ? 'Already added' : (isPending ? 'Requested' : 'Send request');
-        const disabled = (isPending || isAccepted) ? 'disabled' : '';
-        return `
+      results.innerHTML = users.map(u=>`
         <div class="search-row">
           <span>${u.display_name} <span style="color:var(--mint)">@${u.username}</span></span>
-          <button class="btn primary" data-id="${u.id}" ${disabled}>${label}</button>
-        </div>`;
-      }).join('') || '<div class="empty-note">No matches.</div>';
-      results.querySelectorAll('button[data-id]:not([disabled])').forEach(btn=>{
+          <button class="btn primary" data-id="${u.id}">Send request</button>
+        </div>`).join('') || '<div class="empty-note">No matches.</div>';
+      results.querySelectorAll('button[data-id]').forEach(btn=>{
         btn.onclick = async ()=>{
           const res = await Api.addConnection(parseInt(btn.dataset.id));
           if (res.status === 'accepted'){
-            btn.textContent = 'Already added'; btn.disabled = true;
             showToast('Already on your board');
           } else {
             btn.textContent = 'Requested'; btn.disabled = true;
@@ -356,27 +347,10 @@ function wirePeople(){
   loadIncomingRequests();
 }
 
-async function refreshBellBadge(count){
-  const badge = document.getElementById('bellBadge');
-  if (count > 0){
-    badge.textContent = count > 9 ? '9+' : count;
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
-function wireBell(){
-  document.getElementById('requestsBellBtn').onclick = ()=>{
-    document.querySelector('nav.tabs button[data-tab="people"]').click();
-  };
-}
-
 async function loadIncomingRequests(){
   const block = document.getElementById('requestsBlock');
   const list = document.getElementById('requestsList');
   const requests = await Api.incomingRequests();
-  refreshBellBadge(requests.length);
   if (!requests.length){ block.style.display = 'none'; list.innerHTML=''; return; }
   block.style.display = '';
   list.innerHTML = requests.map(r=>`
@@ -579,171 +553,5 @@ function wireUsernameModal(){
   };
 }
 
-/* ---------------- GROUPS ---------------- */
-let groups = [];
-let selectedGroupId = null;
-let groupSelectedDay = null, groupSelectedSlot = null;
-
-function wireGroupsTab(){
-  document.getElementById('createGroupBtn').onclick = async ()=>{
-    const input = document.getElementById('newGroupName');
-    const name = input.value.trim();
-    if (!name){ showToast('Give the group a name first'); return; }
-    try{
-      await Api.createGroup(name);
-      input.value = '';
-      showToast('Group created');
-      await loadGroups();
-    }catch(e){ showToast(e.message); }
-  };
-
-  document.getElementById('leaveGroupBtn').onclick = async ()=>{
-    if (!selectedGroupId) return;
-    if (!confirm('Leave this group? You\'ll stop seeing their free time and they\'ll stop seeing yours.')) return;
-    try{
-      await Api.leaveGroup(selectedGroupId, me.id);
-      showToast('Left the group');
-      selectedGroupId = null;
-      document.getElementById('groupDetail').classList.remove('show');
-      await loadGroups();
-    }catch(e){ showToast(e.message); }
-  };
-
-  document.getElementById('deleteGroupBtn').onclick = async ()=>{
-    if (!selectedGroupId) return;
-    if (!confirm('Delete this group for everyone? This can\'t be undone.')) return;
-    try{
-      await Api.deleteGroup(selectedGroupId);
-      showToast('Group deleted');
-      selectedGroupId = null;
-      document.getElementById('groupDetail').classList.remove('show');
-      await loadGroups();
-    }catch(e){ showToast(e.message); }
-  };
-
-  const inviteSearch = document.getElementById('groupInviteSearch');
-  let debounce;
-  inviteSearch.addEventListener('input', ()=>{
-    clearTimeout(debounce);
-    debounce = setTimeout(async ()=>{
-      const q = inviteSearch.value.trim();
-      const results = document.getElementById('groupInviteResults');
-      if (q.length < 2 || !selectedGroupId){ results.innerHTML=''; return; }
-      const users = await Api.searchUsers(q);
-      results.innerHTML = users.map(u=>`
-        <div class="search-row">
-          <span>${u.display_name} <span style="color:var(--mint)">@${u.username}</span></span>
-          <button class="btn primary" data-invite="${u.id}">Invite</button>
-        </div>`).join('') || '<div class="empty-note">No matches.</div>';
-      results.querySelectorAll('button[data-invite]').forEach(btn=>{
-        btn.onclick = async ()=>{
-          await Api.inviteToGroup(selectedGroupId, parseInt(btn.dataset.invite));
-          btn.textContent = 'Invited'; btn.disabled = true;
-          showToast('Invite sent');
-        };
-      });
-    }, 350);
-  });
-}
-
-async function loadGroups(){
-  groups = await Api.listGroups();
-  const grid = document.getElementById('groupsGrid');
-  grid.innerHTML = groups.map(g=>`
-    <div class="group-card-wrap">
-      <button class="person-btn ${g.id===selectedGroupId?'sel':''}" data-id="${g.id}">${g.name}</button>
-      <span class="group-card-meta">${g.member_count} member${g.member_count!==1?'s':''}</span>
-    </div>`).join('') || '<div class="empty-note">No groups yet — create one above.</div>';
-  grid.querySelectorAll('button[data-id]').forEach(btn=>{
-    btn.onclick = ()=> selectGroup(parseInt(btn.dataset.id));
-  });
-
-  const invites = await Api.groupInvites();
-  const invBlock = document.getElementById('groupInvitesBlock');
-  const invList = document.getElementById('groupInvitesList');
-  if (!invites.length){ invBlock.style.display = 'none'; invList.innerHTML=''; return; }
-  invBlock.style.display = '';
-  invList.innerHTML = invites.map(inv=>`
-    <div class="search-row">
-      <span>Invited to <b>${inv.group_name}</b></span>
-      <span style="display:flex;gap:6px;">
-        <button class="btn primary" data-accept="${inv.member_id}">Accept</button>
-        <button class="btn ghost" data-decline="${inv.member_id}">Decline</button>
-      </span>
-    </div>`).join('');
-  invList.querySelectorAll('button[data-accept]').forEach(btn=>{
-    btn.onclick = async ()=>{ await Api.acceptGroupInvite(parseInt(btn.dataset.accept)); showToast('Joined the group'); await loadGroups(); };
-  });
-  invList.querySelectorAll('button[data-decline]').forEach(btn=>{
-    btn.onclick = async ()=>{ await Api.declineGroupInvite(parseInt(btn.dataset.decline)); showToast('Invite declined'); await loadGroups(); };
-  });
-}
-
-async function selectGroup(groupId){
-  selectedGroupId = groupId;
-  const group = groups.find(g=>g.id===groupId);
-  document.querySelectorAll('#groupsGrid button.person-btn').forEach(b=>b.classList.toggle('sel', parseInt(b.dataset.id)===groupId));
-
-  document.getElementById('groupDetail').classList.add('show');
-  document.getElementById('groupDetailName').textContent = group ? group.name : '—';
-  document.getElementById('deleteGroupBtn').style.display = (group && group.owner_user_id === me.id) ? '' : 'none';
-  document.getElementById('groupInviteSearch').value = '';
-  document.getElementById('groupInviteResults').innerHTML = '';
-
-  const now = new Date();
-  const todayName = now.toLocaleDateString('en-US',{weekday:'long'});
-  groupSelectedDay = DAYS.includes(todayName) ? todayName : 'Monday';
-  const idx = currentSlotIndex(now);
-  groupSelectedSlot = idx !== -1 ? idx : 0;
-
-  renderGroupDayPills(); renderGroupSlotPills(); await loadGroupLive();
-  await renderGroupMembers();
-}
-
-function renderGroupDayPills(){
-  const el = document.getElementById('groupDays');
-  el.innerHTML = DAYS.map(d=>`<button class="pill ${d===groupSelectedDay?'sel':''}" data-day="${d}">${d}</button>`).join('');
-  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ groupSelectedDay=b.dataset.day; renderGroupDayPills(); loadGroupLive(); });
-}
-function renderGroupSlotPills(){
-  const el = document.getElementById('groupSlots');
-  el.innerHTML = SLOTS.map((s,i)=>`<button class="pill slot ${i===groupSelectedSlot?'sel':''}" data-i="${i}">${s.label}</button>`).join('');
-  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ groupSelectedSlot=parseInt(b.dataset.i); renderGroupSlotPills(); loadGroupLive(); });
-}
-
-async function loadGroupLive(){
-  if (!selectedGroupId) return;
-  const data = await Api.groupLive(selectedGroupId, groupSelectedDay, groupSelectedSlot);
-  document.getElementById('groupFree').innerHTML = data.free.length
-    ? data.free.map(p=>`<span class="chip free">${p.display_name}</span>`).join('')
-    : '<span class="chip">Nobody free</span>';
-  document.getElementById('groupBusy').innerHTML = data.busy.length
-    ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
-    : '<span class="chip free">Nobody busy</span>';
-}
-
-async function renderGroupMembers(){
-  if (!selectedGroupId) return;
-  const members = await Api.groupMembers(selectedGroupId);
-  const iAmOwner = groups.find(g=>g.id===selectedGroupId)?.owner_user_id === me.id;
-  const el = document.getElementById('groupMembersList');
-  el.innerHTML = members.map(m=>{
-    const canRemove = iAmOwner && m.user.id !== me.id;
-    const pendingTag = m.status === 'pending' ? ' <span style="color:var(--mint);font-size:10px;">(invited)</span>' : '';
-    return `
-      <span class="chip member-chip ${m.status==='accepted'?'free':''}">
-        ${m.user.display_name}${pendingTag}
-        ${m.is_owner ? '<span class="owner-tag">OWNER</span>' : ''}
-        ${canRemove ? `<button data-remove-member="${m.user.id}" title="Remove">✕</button>` : ''}
-      </span>`;
-  }).join('');
-  el.querySelectorAll('button[data-remove-member]').forEach(btn=>{
-    btn.onclick = async ()=>{
-      await Api.leaveGroup(selectedGroupId, parseInt(btn.dataset.removeMember));
-      showToast('Removed from group');
-      await renderGroupMembers(); await loadGroups();
-    };
-  });
-}
 
 boot();
