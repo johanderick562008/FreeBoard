@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .config import settings
 #from .database import Base, engine
-from .routers import auth, users, timetable, schedule
+from .routers import auth, users, timetable, schedule, groups
 
 # Creates tables if they don't exist yet — schema.sql is the source of truth for
 # production migrations, this is just a dev-convenience fallback.
