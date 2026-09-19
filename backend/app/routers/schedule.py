@@ -8,6 +8,7 @@ from ..security import get_current_user
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+MAX_SLOTS = 16  # generous ceiling — colleges can add/remove periods, this just guards against nonsense input
 
 
 def _my_board(db: Session, user: User) -> list[User]:
@@ -27,7 +28,7 @@ def _status_map(db: Session, people_ids: list[int]) -> dict:
 
 
 @router.get("/live")
-def live(day: str = Query(...), slot_index: int = Query(..., ge=0, le=7),
+def live(day: str = Query(...), slot_index: int = Query(..., ge=0, le=MAX_SLOTS-1),
           db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if day not in DAYS:
         raise HTTPException(status_code=400, detail="Invalid day.")
@@ -44,7 +45,7 @@ def live(day: str = Query(...), slot_index: int = Query(..., ge=0, le=7),
 
 
 @router.get("/browse")
-def browse(day: str = Query(...), slot_index: int = Query(..., ge=0, le=7),
+def browse(day: str = Query(...), slot_index: int = Query(..., ge=0, le=MAX_SLOTS-1),
             db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return live(day=day, slot_index=slot_index, db=db, user=user)
 
@@ -66,7 +67,7 @@ def together(user_ids: str = Query(..., description="comma-separated user ids, m
     status = _status_map(db, ids)
     results = {d: [] for d in DAYS}
     for d in DAYS:
-        for slot_index in range(8):
+        for slot_index in range(MAX_SLOTS):
             if all(status.get(uid, {}).get((d, slot_index), ("", False))[1] for uid in ids):
                 results[d].append(slot_index)
     return results
