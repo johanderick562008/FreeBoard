@@ -18,7 +18,7 @@ function loadSavedSlots(){
     const raw = localStorage.getItem(PERIOD_TIMES_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length === 8) return parsed;
+    if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 16) return parsed;
   }catch(e){ /* ignore malformed storage, fall back to defaults */ }
   return null;
 }
@@ -604,8 +604,12 @@ function buildPeriodSettingsModal(){
         <h3>Period times</h3>
         <button class="modal-close" id="periodSettingsCloseBtn">✕</button>
       </div>
-      <p class="section-sub">Every college runs a different bell schedule — set these once to match yours. The default shown here is what FreeBoard ships with.</p>
+      <p class="section-sub">Every college runs a different bell schedule — set these once to match yours, and add or remove periods if your day has a different number of them. The default shown here is what FreeBoard ships with (8 periods).</p>
       <div id="periodSettingsRows"></div>
+      <div style="display:flex;gap:8px;margin:6px 0 4px;">
+        <button class="btn ghost" id="periodSettingsAddBtn">+ Add period</button>
+        <button class="btn ghost" id="periodSettingsRemoveBtn">− Remove last period</button>
+      </div>
       <div class="modal-error" id="periodSettingsError"></div>
       <div class="modal-actions">
         <button class="btn ghost" id="periodSettingsResetBtn">Reset to default</button>
@@ -624,6 +628,24 @@ function renderPeriodSettingsRows(slots){
       <span style="color:var(--mint);">–</span>
       <input type="time" class="search-box" data-period-end="${i}" value="${s.end}" style="flex:1;">
     </div>`).join('');
+}
+
+// Reads whatever is currently typed into the modal's inputs — used before add/remove
+// so in-progress edits aren't lost when the row count changes.
+function readRowsFromModal(){
+  const starts = document.querySelectorAll('[data-period-start]');
+  const rows = [];
+  starts.forEach((el, i)=>{
+    const end = document.querySelector(`[data-period-end="${i}"]`);
+    rows.push({ start: el.value, end: end ? end.value : '' });
+  });
+  return rows;
+}
+
+function addMinutesToTime(t, mins){
+  let [h,m] = t.split(':').map(Number);
+  let total = ((h*60+m+mins) % 1440 + 1440) % 1440;
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
 }
 
 function openPeriodSettingsModal(){
@@ -653,13 +675,31 @@ function wirePeriodSettingsModal(){
     if (e.target.id === 'periodSettingsResetBtn'){
       renderPeriodSettingsRows(DEFAULT_SLOTS);
     }
+    if (e.target.id === 'periodSettingsAddBtn'){
+      const errEl = document.getElementById('periodSettingsError');
+      const rows = readRowsFromModal();
+      if (rows.length >= 16){ errEl.textContent = 'That\u2019s enough periods for one day — 16 is the max.'; return; }
+      errEl.textContent = '';
+      const last = rows[rows.length - 1];
+      const newStart = last && last.end ? last.end : '09:00';
+      rows.push({ start: newStart, end: addMinutesToTime(newStart, 60) });
+      renderPeriodSettingsRows(rows);
+    }
+    if (e.target.id === 'periodSettingsRemoveBtn'){
+      const errEl = document.getElementById('periodSettingsError');
+      const rows = readRowsFromModal();
+      if (rows.length <= 1){ errEl.textContent = 'You need at least 1 period.'; return; }
+      errEl.textContent = '';
+      rows.pop();
+      renderPeriodSettingsRows(rows);
+    }
     if (e.target.id === 'periodSettingsSaveBtn'){
       const errEl = document.getElementById('periodSettingsError');
       errEl.textContent = '';
+      const rows = readRowsFromModal();
       const newSlots = [];
-      for (let i=0;i<8;i++){
-        const start = document.querySelector(`[data-period-start="${i}"]`).value;
-        const end = document.querySelector(`[data-period-end="${i}"]`).value;
+      for (let i=0;i<rows.length;i++){
+        const { start, end } = rows[i];
         if (!start || !end){ errEl.textContent = 'Every period needs a start and end time.'; return; }
         if (end <= start){ errEl.textContent = `Period ${i+1}: end time must be after start time.`; return; }
         newSlots.push({ start, end, label: `${to12hLabel(start)} – ${to12hLabel(end)}` });
