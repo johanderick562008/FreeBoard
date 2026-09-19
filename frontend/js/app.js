@@ -1,5 +1,5 @@
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-const SLOTS = [
+let SLOTS = [
   {label:'08:45 – 09:45', start:'08:45', end:'09:45'},
   {label:'09:45 – 10:45', start:'09:45', end:'10:45'},
   {label:'11:00 – 12:00', start:'11:00', end:'12:00'},
@@ -9,6 +9,21 @@ const SLOTS = [
   {label:'03:15 – 04:15', start:'15:15', end:'16:15'},
   {label:'04:15 – 05:15', start:'16:15', end:'17:15'},
 ];
+// Frozen copy of the original 8 periods — used by "Reset to default" below.
+const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
+const PERIOD_TIMES_KEY = 'freeboard-period-times';
+
+function loadSavedSlots(){
+  try{
+    const raw = localStorage.getItem(PERIOD_TIMES_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length === 8) return parsed;
+  }catch(e){ /* ignore malformed storage, fall back to defaults */ }
+  return null;
+}
+const savedSlots = loadSavedSlots();
+if (savedSlots) SLOTS = savedSlots; // different college's period times, saved on an earlier visit
 
 let me = null;
 let board = [];          // my connections + me
@@ -37,6 +52,8 @@ async function boot(){
   if (!me) return;
 
   renderMeBox();
+  injectPeriodSettingsButton();
+  wirePeriodSettingsModal();
   if (new URLSearchParams(location.search).get('setup') || /^user[0-9a-f]{8}$/.test(me.username)){
     document.getElementById('usernameModalBg').classList.add('show');
   }
@@ -551,6 +568,106 @@ function wireUsernameModal(){
       renderMeBox();
     }catch(e){ errEl.textContent = e.message; }
   };
+}
+
+/* ---------------- PERIOD TIMES (editable — different colleges run different bell schedules) ---------------- */
+
+function to12hLabel(t24){
+  // "13:00" -> "01:00", matching the existing label style used throughout the app
+  let [h, m] = t24.split(':').map(Number);
+  const h12 = ((h + 11) % 12) + 1;
+  return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function injectPeriodSettingsButton(){
+  if (document.getElementById('periodSettingsBtn')) return; // already injected
+  const meBox = document.getElementById('meBox');
+  const btn = document.createElement('button');
+  btn.id = 'periodSettingsBtn';
+  btn.className = 'name-edit-btn';
+  btn.title = 'Edit period times for your college';
+  btn.style.marginRight = '10px';
+  btn.style.fontSize = '15px';
+  btn.textContent = '⚙';
+  btn.onclick = () => openPeriodSettingsModal();
+  meBox.parentElement.insertBefore(btn, meBox);
+}
+
+function buildPeriodSettingsModal(){
+  if (document.getElementById('periodSettingsModalBg')) return;
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.id = 'periodSettingsModalBg';
+  bg.innerHTML = `
+    <div class="modal lg">
+      <div class="modal-head">
+        <h3>Period times</h3>
+        <button class="modal-close" id="periodSettingsCloseBtn">✕</button>
+      </div>
+      <p class="section-sub">Every college runs a different bell schedule — set these once to match yours. The default shown here is what FreeBoard ships with.</p>
+      <div id="periodSettingsRows"></div>
+      <div class="modal-error" id="periodSettingsError"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="periodSettingsResetBtn">Reset to default</button>
+        <button class="btn primary" id="periodSettingsSaveBtn">Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(bg);
+}
+
+function renderPeriodSettingsRows(slots){
+  const rows = document.getElementById('periodSettingsRows');
+  rows.innerHTML = slots.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <span style="min-width:64px;font-family:var(--font-mono);font-size:12px;color:var(--mint);">Period ${i+1}</span>
+      <input type="time" class="search-box" data-period-start="${i}" value="${s.start}" style="flex:1;">
+      <span style="color:var(--mint);">–</span>
+      <input type="time" class="search-box" data-period-end="${i}" value="${s.end}" style="flex:1;">
+    </div>`).join('');
+}
+
+function openPeriodSettingsModal(){
+  buildPeriodSettingsModal();
+  renderPeriodSettingsRows(SLOTS);
+  document.getElementById('periodSettingsError').textContent = '';
+  document.getElementById('periodSettingsModalBg').classList.add('show');
+}
+
+async function applyNewSlots(newSlots){
+  SLOTS = newSlots;
+  localStorage.setItem(PERIOD_TIMES_KEY, JSON.stringify(SLOTS));
+  // Refresh everything that reads period times/labels
+  renderBrowseSlotPills();
+  try{ await loadBrowse(); }catch(e){}
+  try{ await loadLive(); }catch(e){}
+  if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
+  showToast('Period times updated');
+}
+
+function wirePeriodSettingsModal(){
+  // Modal is built lazily on first open — wiring happens once that DOM exists.
+  document.addEventListener('click', async (e)=>{
+    if (e.target.id === 'periodSettingsCloseBtn' || e.target.id === 'periodSettingsModalBg'){
+      document.getElementById('periodSettingsModalBg')?.classList.remove('show');
+    }
+    if (e.target.id === 'periodSettingsResetBtn'){
+      renderPeriodSettingsRows(DEFAULT_SLOTS);
+    }
+    if (e.target.id === 'periodSettingsSaveBtn'){
+      const errEl = document.getElementById('periodSettingsError');
+      errEl.textContent = '';
+      const newSlots = [];
+      for (let i=0;i<8;i++){
+        const start = document.querySelector(`[data-period-start="${i}"]`).value;
+        const end = document.querySelector(`[data-period-end="${i}"]`).value;
+        if (!start || !end){ errEl.textContent = 'Every period needs a start and end time.'; return; }
+        if (end <= start){ errEl.textContent = `Period ${i+1}: end time must be after start time.`; return; }
+        newSlots.push({ start, end, label: `${to12hLabel(start)} – ${to12hLabel(end)}` });
+      }
+      await applyNewSlots(newSlots);
+      document.getElementById('periodSettingsModalBg').classList.remove('show');
+    }
+  });
 }
 
 
