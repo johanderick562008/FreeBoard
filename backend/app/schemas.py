@@ -28,7 +28,7 @@ class UsernameSetup(BaseModel):
 
 class TimetableCell(BaseModel):
     day: str
-    slot_index: int = Field(ge=0, le=7)
+    slot_index: int = Field(ge=0, le=15)  # generous ceiling — colleges can add/remove periods (was fixed at 8)
     label: str = Field(max_length=80)
 
 
