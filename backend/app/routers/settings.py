@@ -34,17 +34,22 @@ class PeriodSlotsUpdate(BaseModel):
     slots: List[PeriodSlot] = Field(min_length=1, max_length=16)
 
 
-@router.get("/periods")
-def get_periods(db: Session = Depends(get_db)):
-    """Public (no auth needed) so the login page and every viewer sees the same times."""
-    row = db.execute(text("SELECT slots_json FROM period_settings WHERE id = 1")).fetchone()
+@router.get("/periods/{user_id}")
+def get_periods_for_user(user_id: int, db: Session = Depends(get_db), _user: User = Depends(get_current_user)):
+    """Each person's own period structure — how many periods they have and what
+    times they run, exactly as they set it. Falls back to the default 8 if that
+    person never customized it."""
+    row = db.execute(
+        text("SELECT slots_json FROM period_settings WHERE user_id = :uid"), {"uid": user_id}
+    ).fetchone()
     if not row:
         return {"slots": DEFAULT_SLOTS}
     return {"slots": json.loads(row[0])}
 
 
 @router.put("/periods")
-def set_periods(body: PeriodSlotsUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def set_my_periods(body: PeriodSlotsUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Saves the CURRENT user's own period structure — never anyone else's."""
     for s in body.slots:
         if s.end <= s.start:
             raise HTTPException(status_code=422, detail=f"End time must be after start time ({s.label}).")
@@ -52,10 +57,10 @@ def set_periods(body: PeriodSlotsUpdate, db: Session = Depends(get_db), user: Us
     slots_json = json.dumps([s.model_dump() for s in body.slots])
     db.execute(
         text("""
-            INSERT INTO period_settings (id, slots_json) VALUES (1, :slots)
+            INSERT INTO period_settings (user_id, slots_json) VALUES (:uid, :slots)
             ON DUPLICATE KEY UPDATE slots_json = :slots
         """),
-        {"slots": slots_json},
+        {"uid": user.id, "slots": slots_json},
     )
     db.commit()
     return {"status": "saved"}
