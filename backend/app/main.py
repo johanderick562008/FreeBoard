@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .config import settings
 #from .database import Base, engine
-from .routers import auth, users, timetable, schedule
+from .routers import auth, users, timetable, schedule, settings
 
 # Creates tables if they don't exist yet — schema.sql is the source of truth for
 # production migrations, this is just a dev-convenience fallback.
@@ -38,6 +38,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(timetable.router)
 app.include_router(schedule.router)
+app.include_router(settings.router)
 
 
 @app.get("/health")
