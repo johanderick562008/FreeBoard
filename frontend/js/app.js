@@ -12,15 +12,15 @@ let SLOTS = [
 // Frozen copy of the original 8 periods — used by "Reset to default" below.
 const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
 
-// Period times are a SHARED setting stored on the server (not localStorage) — everyone
-// viewing this board needs to agree on what "period 3" actually means as a clock time,
-// otherwise Live/Browse/Together comparisons between two people are meaningless.
+// Period times are PER-PERSON, stored server-side (not localStorage) so they sync
+// across devices. This loads the CURRENT user's own structure, used as the reference
+// frame for Browse/Live/Together and their own timetable builder.
 async function loadPeriodSettingsFromServer(){
   try{
-    const res = await Api.getPeriodSettings();
+    const res = await Api.getPeriodSettings(me.id);
     if (res && Array.isArray(res.slots) && res.slots.length >= 1) SLOTS = res.slots;
   }catch(e){
-    console.error('Could not load shared period settings — using defaults', e);
+    console.error('Could not load your period settings — using defaults', e);
   }
 }
 
@@ -436,6 +436,19 @@ async function renderDetail(){
   entries.forEach(e=>{ map[`${e.day}|${e.slot_index}`] = e; });
   const isMine = selectedPersonId === me.id;
 
+  // Show each person's OWN period structure (their count, their times) — not the
+  // viewer's. Only fetch a second time when looking at someone else; your own
+  // SLOTS is already loaded globally.
+  let viewSlots = SLOTS;
+  if (!isMine){
+    try{
+      const res = await Api.getPeriodSettings(selectedPersonId);
+      if (res && Array.isArray(res.slots) && res.slots.length >= 1) viewSlots = res.slots;
+    }catch(e){
+      console.error("Could not load this person's period settings — showing default", e);
+    }
+  }
+
   const toolbar = document.getElementById('builderToolbar');
   toolbar.style.display = isMine ? '' : 'none';
 
@@ -445,9 +458,9 @@ async function renderDetail(){
     document.getElementById('subjectSuggestions').innerHTML = subjects.map(s=>`<option value="${s}">`).join('');
   }
 
-  let thead = '<tr><th>Day</th>' + SLOTS.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
+  let thead = '<tr><th>Day</th>' + viewSlots.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
   let rows = DAYS.map(day=>{
-    const cells = SLOTS.map((s,i)=>{
+    const cells = viewSlots.map((s,i)=>{
       const e = map[`${day}|${i}`];
       const label = e ? e.label : 'Not set';
       const isFree = e ? e.is_free : false;
@@ -604,7 +617,7 @@ function buildPeriodSettingsModal(){
         <h3>Period times</h3>
         <button class="modal-close" id="periodSettingsCloseBtn">✕</button>
       </div>
-      <p class="section-sub">One shared schedule for everyone on this board — set these once to match your college, and add or remove periods if your day has a different number of them. Saving updates it for everyone, not just you.</p>
+      <p class="section-sub">This is YOUR own schedule — set your real period times and count here. Friends viewing your timetable will see it exactly as you set it, even if their own schedule looks different.</p>
       <div id="periodSettingsRows"></div>
       <div style="display:flex;gap:8px;margin:6px 0 4px;">
         <button class="btn ghost" id="periodSettingsAddBtn">+ Add period</button>
@@ -666,7 +679,7 @@ async function applyNewSlots(newSlots){
     try{ await loadBrowse(); }catch(e){}
     try{ await loadLive(); }catch(e){}
     if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
-    showToast('Period times updated for everyone');
+    showToast('Your period times were updated');
     return true;
   }catch(e){
     if (errEl) errEl.textContent = e.message;
