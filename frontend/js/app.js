@@ -11,19 +11,18 @@ let SLOTS = [
 ];
 // Frozen copy of the original 8 periods — used by "Reset to default" below.
 const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
-const PERIOD_TIMES_KEY = 'freeboard-period-times';
 
-function loadSavedSlots(){
+// Period times are a SHARED setting stored on the server (not localStorage) — everyone
+// viewing this board needs to agree on what "period 3" actually means as a clock time,
+// otherwise Live/Browse/Together comparisons between two people are meaningless.
+async function loadPeriodSettingsFromServer(){
   try{
-    const raw = localStorage.getItem(PERIOD_TIMES_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 16) return parsed;
-  }catch(e){ /* ignore malformed storage, fall back to defaults */ }
-  return null;
+    const res = await Api.getPeriodSettings();
+    if (res && Array.isArray(res.slots) && res.slots.length >= 1) SLOTS = res.slots;
+  }catch(e){
+    console.error('Could not load shared period settings — using defaults', e);
+  }
 }
-const savedSlots = loadSavedSlots();
-if (savedSlots) SLOTS = savedSlots; // different college's period times, saved on an earlier visit
 
 let me = null;
 let board = [];          // my connections + me
@@ -54,6 +53,7 @@ async function boot(){
   renderMeBox();
   injectPeriodSettingsButton();
   wirePeriodSettingsModal();
+  await loadPeriodSettingsFromServer(); // shared for everyone — must load before Browse/Live/timetable render
   if (new URLSearchParams(location.search).get('setup') || /^user[0-9a-f]{8}$/.test(me.username)){
     document.getElementById('usernameModalBg').classList.add('show');
   }
@@ -604,7 +604,7 @@ function buildPeriodSettingsModal(){
         <h3>Period times</h3>
         <button class="modal-close" id="periodSettingsCloseBtn">✕</button>
       </div>
-      <p class="section-sub">Every college runs a different bell schedule — set these once to match yours, and add or remove periods if your day has a different number of them. The default shown here is what FreeBoard ships with (8 periods).</p>
+      <p class="section-sub">One shared schedule for everyone on this board — set these once to match your college, and add or remove periods if your day has a different number of them. Saving updates it for everyone, not just you.</p>
       <div id="periodSettingsRows"></div>
       <div style="display:flex;gap:8px;margin:6px 0 4px;">
         <button class="btn ghost" id="periodSettingsAddBtn">+ Add period</button>
@@ -656,14 +656,24 @@ function openPeriodSettingsModal(){
 }
 
 async function applyNewSlots(newSlots){
-  SLOTS = newSlots;
-  localStorage.setItem(PERIOD_TIMES_KEY, JSON.stringify(SLOTS));
-  // Refresh everything that reads period times/labels
-  renderBrowseSlotPills();
-  try{ await loadBrowse(); }catch(e){}
-  try{ await loadLive(); }catch(e){}
-  if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
-  showToast('Period times updated');
+  const saveBtn = document.getElementById('periodSettingsSaveBtn');
+  const errEl = document.getElementById('periodSettingsError');
+  if (saveBtn) saveBtn.disabled = true;
+  try{
+    await Api.savePeriodSettings(newSlots); // shared for the whole board, not just this device
+    SLOTS = newSlots;
+    renderBrowseSlotPills();
+    try{ await loadBrowse(); }catch(e){}
+    try{ await loadLive(); }catch(e){}
+    if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
+    showToast('Period times updated for everyone');
+    return true;
+  }catch(e){
+    if (errEl) errEl.textContent = e.message;
+    return false;
+  }finally{
+    if (saveBtn) saveBtn.disabled = false;
+  }
 }
 
 function wirePeriodSettingsModal(){
@@ -704,8 +714,8 @@ function wirePeriodSettingsModal(){
         if (end <= start){ errEl.textContent = `Period ${i+1}: end time must be after start time.`; return; }
         newSlots.push({ start, end, label: `${to12hLabel(start)} – ${to12hLabel(end)}` });
       }
-      await applyNewSlots(newSlots);
-      document.getElementById('periodSettingsModalBg').classList.remove('show');
+      const ok = await applyNewSlots(newSlots);
+      if (ok) document.getElementById('periodSettingsModalBg').classList.remove('show');
     }
   });
 }
