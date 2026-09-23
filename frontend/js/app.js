@@ -53,8 +53,7 @@ async function boot(){
   if (!me) return;
 
   renderMeBox();
-  injectPeriodSettingsButton();
-  injectNotificationBell();
+  setupHeaderExtras();
   wirePeriodSettingsModal();
   if (new URLSearchParams(location.search).get('setup') || /^user[0-9a-f]{8}$/.test(me.username)){
     document.getElementById('usernameModalBg').classList.add('show');
@@ -583,46 +582,58 @@ function to12hLabel(t24){
   return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
 
-function injectPeriodSettingsButton(){
-  if (document.getElementById('periodSettingsBtn')) return; // already injected
-  const btn = document.createElement('button');
-  btn.id = 'periodSettingsBtn';
-  btn.className = 'name-edit-btn';
-  btn.title = 'Edit period times for your college';
-  btn.style.fontSize = '15px';
-  btn.textContent = '⚙';
-  btn.onclick = () => openPeriodSettingsModal();
-  const header = document.querySelector('header.top');
-  header.insertBefore(btn, header.firstChild); // far left corner of the header
-}
-
-function injectNotificationBell(){
-  if (document.getElementById('notifBellBtn')) return; // already injected
+function setupHeaderExtras(){
+  if (document.getElementById('headerRightCol')) return; // already set up
   const meBox = document.getElementById('meBox');
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:relative;display:inline-flex;margin-right:10px;';
+  const header = document.querySelector('header.top');
 
-  const btn = document.createElement('button');
-  btn.id = 'notifBellBtn';
-  btn.className = 'name-edit-btn';
-  btn.title = 'Requests';
-  btn.style.fontSize = '17px';
-  btn.textContent = '🔔';
-  btn.onclick = () => {
+  // Right-side column: bell + profile on top, settings tucked below it —
+  // keeps "FreeBoard · clock" as the only thing in the leftmost corner.
+  const col = document.createElement('div');
+  col.id = 'headerRightCol';
+  col.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:6px;';
+
+  const topRow = document.createElement('div');
+  topRow.style.cssText = 'display:flex;align-items:center;gap:10px;';
+
+  const bellWrap = document.createElement('div');
+  bellWrap.style.cssText = 'position:relative;display:inline-flex;';
+  const bellBtn = document.createElement('button');
+  bellBtn.id = 'notifBellBtn';
+  bellBtn.className = 'name-edit-btn';
+  bellBtn.title = 'Requests';
+  bellBtn.style.fontSize = '17px';
+  bellBtn.textContent = '🔔';
+  bellBtn.onclick = () => {
     document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     document.querySelector('nav.tabs button[data-tab="people"]').classList.add('active');
     document.getElementById('panel-people').classList.add('active');
     loadIncomingRequests();
   };
-
   const badge = document.createElement('span');
   badge.id = 'notifBellBadge';
   badge.style.cssText = 'position:absolute;top:-4px;right:-6px;min-width:16px;height:16px;padding:0 4px;background:var(--busy);color:#fff;border-radius:999px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--black);';
+  bellWrap.appendChild(bellBtn);
+  bellWrap.appendChild(badge);
 
-  wrap.appendChild(btn);
-  wrap.appendChild(badge);
-  meBox.parentElement.insertBefore(wrap, meBox);
+  topRow.appendChild(bellWrap);
+  topRow.appendChild(meBox); // moves the existing profile chip in here, doesn't recreate it
+
+  const bottomRow = document.createElement('div');
+  bottomRow.style.cssText = 'display:flex;';
+  const gearBtn = document.createElement('button');
+  gearBtn.id = 'periodSettingsBtn';
+  gearBtn.className = 'name-edit-btn';
+  gearBtn.title = 'Edit period times for your college';
+  gearBtn.style.cssText = 'font-size:11.5px;display:flex;align-items:center;gap:4px;';
+  gearBtn.innerHTML = '⚙ <span>Period times</span>';
+  gearBtn.onclick = () => openPeriodSettingsModal();
+  bottomRow.appendChild(gearBtn);
+
+  col.appendChild(topRow);
+  col.appendChild(bottomRow);
+  header.appendChild(col); // header.top's only other child is .brand — space-between keeps this cleanly right-aligned
 }
 
 function updateBellBadge(count){
