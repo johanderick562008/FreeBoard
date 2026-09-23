@@ -6,7 +6,8 @@
 <title>FreeBoard</title>
 <link rel="icon" type="image/png" href="./logo.png?v=2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,450;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -16,14 +17,16 @@
       <div class="mark"><span class="dot"></span> FreeBoard</div>
       <div class="sub" id="clockLine">— · —</div>
     </div>
-    <div class="me" id="meBox"><!-- filled by JS --></div>
+    <div class="fb-headright" id="headerRight">
+      <div class="me" id="meBox"><!-- filled by JS --></div>
+    </div>
   </header>
 
   <nav class="tabs">
-    <button data-tab="live" class="active">🔴 Live Now</button>
-    <button data-tab="browse">📅 Browse</button>
-    <button data-tab="people">👥 People</button>
-    <button data-tab="together">🤝 Free Together</button>
+    <button data-tab="live" class="active"><span class="live-dot"></span>Live Now</button>
+    <button data-tab="browse">Browse</button>
+    <button data-tab="people">People</button>
+    <button data-tab="together">Free Together</button>
   </nav>
 
   <section class="panel active" id="panel-live">
@@ -57,7 +60,10 @@
     <p class="section-sub">Search a username to add them to your board, or manage your own timetable.</p>
 
     <div class="addbar">
-      <input class="search-box" id="userSearch" placeholder="Search by username or name…">
+      <div class="search-wrap">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input class="search-box has-icon" id="userSearch" placeholder="Search by username or name…">
+      </div>
     </div>
     <div class="search-results" id="searchResults"></div>
 
@@ -118,7 +124,7 @@
   <div class="modal">
     <div class="modal-head">
       <h3>Edit your name</h3>
-      <button class="modal-close" id="editNameCloseBtn" aria-label="Close">✕</button>
+      <button class="modal-close" id="editNameCloseBtn" aria-label="Close"><span class="material-symbols-outlined" style="font-size:17px;">close</span></button>
     </div>
     <p class="section-sub">Only you can change this — it's how you appear to everyone.</p>
     <input class="search-box" id="editNameInput" maxlength="100" style="margin-bottom:6px;">
@@ -135,7 +141,7 @@
   <div class="modal">
     <div class="modal-head">
       <h3>Edit person's name</h3>
-      <button class="modal-close" id="editNicknameCloseBtn" aria-label="Close">✕</button>
+      <button class="modal-close" id="editNicknameCloseBtn" aria-label="Close"><span class="material-symbols-outlined" style="font-size:17px;">close</span></button>
     </div>
     <p class="section-sub">Actual name: <b id="nicknameRealName">—</b></p>
     <label class="modal-label">Your nickname for them</label>
@@ -154,7 +160,7 @@
   <div class="modal">
     <div class="modal-head">
       <h3>Remove person?</h3>
-      <button class="modal-close" id="removePersonCloseBtn" aria-label="Close">✕</button>
+      <button class="modal-close" id="removePersonCloseBtn" aria-label="Close"><span class="material-symbols-outlined" style="font-size:17px;">close</span></button>
     </div>
     <p class="section-sub" id="removePersonText">Are you sure you want to remove them from your People list?</p>
     <div class="modal-error" id="removePersonError"></div>
@@ -169,7 +175,7 @@
 
 <div class="made-by">
   <span class="made-by-dot"></span>
-  <span>Devoloped by <b>@Johan_Derick</b></span>
+  <span>Made by <b>@Johan_Derick</b></span>
 </div>
 
 <script src="js/api.js"></script>
