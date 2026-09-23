@@ -9,22 +9,20 @@ let SLOTS = [
   {label:'03:15 – 04:15', start:'15:15', end:'16:15'},
   {label:'04:15 – 05:15', start:'16:15', end:'17:15'},
 ];
-
-
+// Frozen copy of the original 8 periods — used by "Reset to default" below.
 const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
-const PERIOD_TIMES_KEY = 'freeboard-period-times';
 
-function loadSavedSlots(){
+// Period times are PER-PERSON, stored server-side (not localStorage) so they sync
+// across devices. This loads the CURRENT user's own structure, used as the reference
+// frame for Browse/Live/Together and their own timetable builder.
+async function loadPeriodSettingsFromServer(){
   try{
-    const raw = localStorage.getItem(PERIOD_TIMES_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 16) return parsed;
-  }catch(e){ /* ignore malformed storage, fall back to defaults */ }
-  return null;
+    const res = await Api.getPeriodSettings(me.id);
+    if (res && Array.isArray(res.slots) && res.slots.length >= 1) SLOTS = res.slots;
+  }catch(e){
+    console.error('Could not load your period settings — using defaults', e);
+  }
 }
-const savedSlots = loadSavedSlots();
-if (savedSlots) SLOTS = savedSlots; // different college's period times, saved on an earlier visit
 
 let me = null;
 let board = [];          // my connections + me
@@ -53,8 +51,9 @@ async function boot(){
   if (!me) return;
 
   renderMeBox();
-  setupHeaderExtras();
+  injectPeriodSettingsButton();
   wirePeriodSettingsModal();
+  await loadPeriodSettingsFromServer(); // shared for everyone — must load before Browse/Live/timetable render
   if (new URLSearchParams(location.search).get('setup') || /^user[0-9a-f]{8}$/.test(me.username)){
     document.getElementById('usernameModalBg').classList.add('show');
   }
@@ -69,7 +68,6 @@ async function boot(){
 
   tickClock(); setInterval(tickClock, 1000);
   setInterval(loadLive, 20000);
-  setInterval(loadIncomingRequests, 30000);
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
   wireNameModal(); wireNicknameModal(); wireRemoveModal();
@@ -370,7 +368,6 @@ async function loadIncomingRequests(){
   const block = document.getElementById('requestsBlock');
   const list = document.getElementById('requestsList');
   const requests = await Api.incomingRequests();
-  updateBellBadge(requests.length);
   if (!requests.length){ block.style.display = 'none'; list.innerHTML=''; return; }
   block.style.display = '';
   list.innerHTML = requests.map(r=>`
@@ -439,6 +436,19 @@ async function renderDetail(){
   entries.forEach(e=>{ map[`${e.day}|${e.slot_index}`] = e; });
   const isMine = selectedPersonId === me.id;
 
+  // Show each person's OWN period structure (their count, their times) — not the
+  // viewer's. Only fetch a second time when looking at someone else; your own
+  // SLOTS is already loaded globally.
+  let viewSlots = SLOTS;
+  if (!isMine){
+    try{
+      const res = await Api.getPeriodSettings(selectedPersonId);
+      if (res && Array.isArray(res.slots) && res.slots.length >= 1) viewSlots = res.slots;
+    }catch(e){
+      console.error("Could not load this person's period settings — showing default", e);
+    }
+  }
+
   const toolbar = document.getElementById('builderToolbar');
   toolbar.style.display = isMine ? '' : 'none';
 
@@ -448,9 +458,9 @@ async function renderDetail(){
     document.getElementById('subjectSuggestions').innerHTML = subjects.map(s=>`<option value="${s}">`).join('');
   }
 
-  let thead = '<tr><th>Day</th>' + SLOTS.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
+  let thead = '<tr><th>Day</th>' + viewSlots.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
   let rows = DAYS.map(day=>{
-    const cells = SLOTS.map((s,i)=>{
+    const cells = viewSlots.map((s,i)=>{
       const e = map[`${day}|${i}`];
       const label = e ? e.label : 'Not set';
       const isFree = e ? e.is_free : false;
@@ -582,69 +592,18 @@ function to12hLabel(t24){
   return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
 
-function setupHeaderExtras(){
-  if (document.getElementById('headerRightCol')) return; // already set up
+function injectPeriodSettingsButton(){
+  if (document.getElementById('periodSettingsBtn')) return; // already injected
   const meBox = document.getElementById('meBox');
-  const header = document.querySelector('header.top');
-
-  // Right-side column: bell + profile on top, settings tucked below it —
-  // keeps "FreeBoard · clock" as the only thing in the leftmost corner.
-  const col = document.createElement('div');
-  col.id = 'headerRightCol';
-  col.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:6px;';
-
-  const topRow = document.createElement('div');
-  topRow.style.cssText = 'display:flex;align-items:center;gap:10px;';
-
-  const bellWrap = document.createElement('div');
-  bellWrap.style.cssText = 'position:relative;display:inline-flex;';
-  const bellBtn = document.createElement('button');
-  bellBtn.id = 'notifBellBtn';
-  bellBtn.className = 'name-edit-btn';
-  bellBtn.title = 'Requests';
-  bellBtn.style.fontSize = '17px';
-  bellBtn.textContent = '🔔';
-  bellBtn.onclick = () => {
-    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    document.querySelector('nav.tabs button[data-tab="people"]').classList.add('active');
-    document.getElementById('panel-people').classList.add('active');
-    loadIncomingRequests();
-  };
-  const badge = document.createElement('span');
-  badge.id = 'notifBellBadge';
-  badge.style.cssText = 'position:absolute;top:-4px;right:-6px;min-width:16px;height:16px;padding:0 4px;background:var(--busy);color:#fff;border-radius:999px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--black);';
-  bellWrap.appendChild(bellBtn);
-  bellWrap.appendChild(badge);
-
-  topRow.appendChild(bellWrap);
-  topRow.appendChild(meBox); // moves the existing profile chip in here, doesn't recreate it
-
-  const bottomRow = document.createElement('div');
-  bottomRow.style.cssText = 'display:flex;';
-  const gearBtn = document.createElement('button');
-  gearBtn.id = 'periodSettingsBtn';
-  gearBtn.className = 'name-edit-btn';
-  gearBtn.title = 'Edit period times for your college';
-  gearBtn.style.cssText = 'font-size:11.5px;display:flex;align-items:center;gap:4px;';
-  gearBtn.innerHTML = '⚙ <span>Period times</span>';
-  gearBtn.onclick = () => openPeriodSettingsModal();
-  bottomRow.appendChild(gearBtn);
-
-  col.appendChild(topRow);
-  col.appendChild(bottomRow);
-  header.appendChild(col); // header.top's only other child is .brand — space-between keeps this cleanly right-aligned
-}
-
-function updateBellBadge(count){
-  const badge = document.getElementById('notifBellBadge');
-  if (!badge) return;
-  if (count > 0){
-    badge.textContent = count > 9 ? '9+' : String(count);
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
+  const btn = document.createElement('button');
+  btn.id = 'periodSettingsBtn';
+  btn.className = 'name-edit-btn';
+  btn.title = 'Edit period times for your college';
+  btn.style.marginRight = '10px';
+  btn.style.fontSize = '15px';
+  btn.textContent = '⚙';
+  btn.onclick = () => openPeriodSettingsModal();
+  meBox.parentElement.insertBefore(btn, meBox);
 }
 
 function buildPeriodSettingsModal(){
@@ -658,7 +617,7 @@ function buildPeriodSettingsModal(){
         <h3>Period times</h3>
         <button class="modal-close" id="periodSettingsCloseBtn">✕</button>
       </div>
-      <p class="section-sub">Every college runs a different bell schedule — set these once to match yours, and add or remove periods if your day has a different number of them. The default shown here is what FreeBoard ships with (8 periods).</p>
+      <p class="section-sub">This is YOUR own schedule — set your real period times and count here. Friends viewing your timetable will see it exactly as you set it, even if their own schedule looks different.</p>
       <div id="periodSettingsRows"></div>
       <div style="display:flex;gap:8px;margin:6px 0 4px;">
         <button class="btn ghost" id="periodSettingsAddBtn">+ Add period</button>
@@ -710,14 +669,24 @@ function openPeriodSettingsModal(){
 }
 
 async function applyNewSlots(newSlots){
-  SLOTS = newSlots;
-  localStorage.setItem(PERIOD_TIMES_KEY, JSON.stringify(SLOTS));
-  // Refresh everything that reads period times/labels
-  renderBrowseSlotPills();
-  try{ await loadBrowse(); }catch(e){}
-  try{ await loadLive(); }catch(e){}
-  if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
-  showToast('Period times updated');
+  const saveBtn = document.getElementById('periodSettingsSaveBtn');
+  const errEl = document.getElementById('periodSettingsError');
+  if (saveBtn) saveBtn.disabled = true;
+  try{
+    await Api.savePeriodSettings(newSlots); // shared for the whole board, not just this device
+    SLOTS = newSlots;
+    renderBrowseSlotPills();
+    try{ await loadBrowse(); }catch(e){}
+    try{ await loadLive(); }catch(e){}
+    if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
+    showToast('Your period times were updated');
+    return true;
+  }catch(e){
+    if (errEl) errEl.textContent = e.message;
+    return false;
+  }finally{
+    if (saveBtn) saveBtn.disabled = false;
+  }
 }
 
 function wirePeriodSettingsModal(){
@@ -758,8 +727,8 @@ function wirePeriodSettingsModal(){
         if (end <= start){ errEl.textContent = `Period ${i+1}: end time must be after start time.`; return; }
         newSlots.push({ start, end, label: `${to12hLabel(start)} – ${to12hLabel(end)}` });
       }
-      await applyNewSlots(newSlots);
-      document.getElementById('periodSettingsModalBg').classList.remove('show');
+      const ok = await applyNewSlots(newSlots);
+      if (ok) document.getElementById('periodSettingsModalBg').classList.remove('show');
     }
   });
 }
