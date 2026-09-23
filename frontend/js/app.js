@@ -9,22 +9,20 @@ let SLOTS = [
   {label:'03:15 – 04:15', start:'15:15', end:'16:15'},
   {label:'04:15 – 05:15', start:'16:15', end:'17:15'},
 ];
-
-
+// Frozen copy of the original 8 periods — used by "Reset to default" below.
 const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
-const PERIOD_TIMES_KEY = 'freeboard-period-times';
 
-function loadSavedSlots(){
+// Period times are PER-PERSON, stored server-side (not localStorage) so they sync
+// across devices. This loads the CURRENT user's own structure, used as the reference
+// frame for Browse/Live/Together and their own timetable builder.
+async function loadPeriodSettingsFromServer(){
   try{
-    const raw = localStorage.getItem(PERIOD_TIMES_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 16) return parsed;
-  }catch(e){ /* ignore malformed storage, fall back to defaults */ }
-  return null;
+    const res = await Api.getPeriodSettings(me.id);
+    if (res && Array.isArray(res.slots) && res.slots.length >= 1) SLOTS = res.slots;
+  }catch(e){
+    console.error('Could not load your period settings — using defaults', e);
+  }
 }
-const savedSlots = loadSavedSlots();
-if (savedSlots) SLOTS = savedSlots; // different college's period times, saved on an earlier visit
 
 let me = null;
 let board = [];          // my connections + me
@@ -47,21 +45,6 @@ function currentSlotIndex(now){
   return -1;
 }
 
-// "Johan Derick" -> "JD" — used for the avatar-circle pattern everywhere a photo isn't available
-function initials(name){
-  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
-}
-
-// "16:15" -> "4:15 PM" — used for the "Until ..." line on the Live board
-function to12hMeridiem(t24){
-  let [h,m] = t24.split(':').map(Number);
-  const period = h >= 12 ? 'PM' : 'AM';
-  let h12 = h % 12; if (h12 === 0) h12 = 12;
-  return `${h12}:${String(m).padStart(2,'0')} ${period}`;
-}
-
 /* ---------------- boot ---------------- */
 async function boot(){
   try{ me = await Api.me(); }catch(e){ window.location.href = 'index.html'; return; }
@@ -70,6 +53,7 @@ async function boot(){
   renderMeBox();
   injectPeriodSettingsButton();
   wirePeriodSettingsModal();
+  await loadPeriodSettingsFromServer(); // shared for everyone — must load before Browse/Live/timetable render
   if (new URLSearchParams(location.search).get('setup') || /^user[0-9a-f]{8}$/.test(me.username)){
     document.getElementById('usernameModalBg').classList.add('show');
   }
@@ -108,15 +92,12 @@ async function boot(){
 }
 
 function renderMeBox(){
-  const avatar = me.avatar_url
-    ? `<img src="${me.avatar_url}" alt="">`
-    : `<div class="avatar-circle sm">${initials(me.display_name)}</div>`;
   document.getElementById('meBox').innerHTML = `
-    ${avatar}
+    ${me.avatar_url ? `<img src="${me.avatar_url}" alt="">` : ''}
     <div>
       <div class="name">
         <span id="myNameText">${me.display_name}</span>
-        <button class="name-edit-btn" id="editMyNameBtn" title="Edit your name"><span class="material-symbols-outlined" style="font-size:13px;">edit</span></button>
+        <button class="name-edit-btn" id="editMyNameBtn" title="Edit your name">✎</button>
       </div>
       <a href="#" class="logout" id="logoutLink">@${me.username} · log out</a>
     </div>`;
@@ -304,55 +285,30 @@ async function loadLive(){
   const badge=document.getElementById('liveBadge'), slotLine=document.getElementById('liveSlotLine'),
         heading=document.getElementById('liveHeading'), boardEl=document.getElementById('liveBoard'),
         busyEl=document.getElementById('liveBusy'), countEl=document.getElementById('liveCount');
-  busyEl.innerHTML = ''; // busy people now render inline in boardEl — this strip stays empty
 
   if (!DAYS.includes(dayName)){
     badge.textContent='WEEKEND'; badge.classList.add('off');
     slotLine.textContent='No classes today'; heading.textContent="It's the weekend 🎉";
-    boardEl.innerHTML=''; countEl.textContent=''; return;
+    boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
   }
   const idx = currentSlotIndex(now);
   if (idx === -1){
     badge.textContent='BREAK'; badge.classList.add('off');
     slotLine.textContent='Between periods'; heading.textContent='Break time ☕';
-    boardEl.innerHTML=''; countEl.textContent=''; return;
+    boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
   }
   badge.textContent='CLASSES ON'; badge.classList.remove('off');
   slotLine.innerHTML = `${dayName} · <b>${SLOTS[idx].label}</b>`;
 
   const data = await Api.live(dayName, idx);
-  const until = `Until ${to12hMeridiem(SLOTS[idx].end)}`;
   countEl.textContent = `${data.free.length} / ${data.free.length + data.busy.length} free`;
   heading.textContent = data.free.length ? 'Free right now' : "Nobody's free this period";
-
-  const rows = [
-    ...data.free.map(p => ({...p, isFree: true, statusText: 'Free now'})),
-    ...data.busy.map(p => ({...p, isFree: false, statusText: p.label})),
-  ];
-
-  boardEl.innerHTML = rows.length ? rows.map((p,i)=>`
-    <article class="friend-row" style="animation-delay:${i*35}ms" data-status="${p.isFree ? 'free' : 'busy'}">
-      <div class="friend-row-left">
-        <div class="avatar-wrap">
-          <div class="avatar-circle ${p.isFree ? '' : 'muted'}">${initials(p.display_name)}</div>
-          <span class="avatar-status-dot ${p.isFree ? 'free' : 'busy'}"></span>
-        </div>
-        <div class="friend-row-id">
-          <span class="friend-name">${p.display_name}</span>
-          <span class="friend-username">@${p.username}</span>
-        </div>
-      </div>
-      <div class="friend-row-right">
-        <div class="friend-row-until">
-          <span class="friend-row-until-label">${p.isFree ? 'FREE PERIOD' : 'IN CLASS'}</span>
-          <span class="friend-row-until-time">${until}</span>
-        </div>
-        <div class="status-pill ${p.isFree ? 'free' : 'busy'}">
-          <span class="status-pill-dot"></span>${p.statusText}
-        </div>
-      </div>
-    </article>`).join('')
-    : '<div class="empty-note">No one on your board has this period yet.</div>';
+  boardEl.innerHTML = data.free.length
+    ? data.free.map((p,i)=>`<div class="flip" style="animation-delay:${i*45}ms"><div class="name">${p.display_name}</div><div class="tag">Free now</div></div>`).join('')
+    : '<div class="empty-note">No one on your board is free this period.</div>';
+  busyEl.innerHTML = data.busy.length
+    ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
+    : '<span class="chip free">Nobody — everyone free!</span>';
 }
 
 /* ---------------- BROWSE ---------------- */
@@ -389,13 +345,7 @@ function wirePeople(){
       const users = await Api.searchUsers(q);
       results.innerHTML = users.map(u=>`
         <div class="search-row">
-          <div class="friend-row-left">
-            <div class="avatar-circle sm">${initials(u.display_name)}</div>
-            <div class="friend-row-id">
-              <span class="friend-name">${u.display_name}</span>
-              <span class="friend-username">@${u.username}</span>
-            </div>
-          </div>
+          <span>${u.display_name} <span style="color:var(--mint)">@${u.username}</span></span>
           <button class="btn primary" data-id="${u.id}">Send request</button>
         </div>`).join('') || '<div class="empty-note">No matches.</div>';
       results.querySelectorAll('button[data-id]').forEach(btn=>{
@@ -421,18 +371,12 @@ async function loadIncomingRequests(){
   if (!requests.length){ block.style.display = 'none'; list.innerHTML=''; return; }
   block.style.display = '';
   list.innerHTML = requests.map(r=>`
-    <div class="request-card">
-      <div class="friend-row-left">
-        <div class="avatar-circle secondary">${initials(r.user.display_name)}</div>
-        <div class="friend-row-id">
-          <span class="friend-name">${r.user.display_name}</span>
-          <span class="friend-username">@${r.user.username} wants to connect</span>
-        </div>
-      </div>
-      <div class="request-card-actions">
-        <button class="btn accept" data-accept="${r.request_id}"><span class="material-symbols-outlined" style="font-size:15px;">check</span>Accept</button>
+    <div class="search-row">
+      <span>${r.user.display_name} <span style="color:var(--mint)">@${r.user.username}</span> wants to add you</span>
+      <span style="display:flex;gap:6px;">
+        <button class="btn primary" data-accept="${r.request_id}">Accept</button>
         <button class="btn ghost" data-decline="${r.request_id}">Decline</button>
-      </div>
+      </span>
     </div>`).join('');
   list.querySelectorAll('button[data-accept]').forEach(btn=>{
     btn.onclick = async ()=>{
@@ -454,14 +398,11 @@ function renderPeopleGrid(){
   const el = document.getElementById('peopleGrid');
   el.innerHTML = board.map(p=>`
     <div class="person-card-wrap">
-      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">
-        <div class="avatar-circle sm ${p.id===selectedPersonId?'on-primary':''}">${initials(p.display_name)}</div>
-        <span>${p.display_name}</span>
-      </button>
+      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${p.display_name}</button>
       ${p.id!==me.id ? `
         <div class="person-card-actions">
-          <button data-rename="${p.id}" title="Rename for you only"><span class="material-symbols-outlined" style="font-size:13px;">edit</span></button>
-          <button class="remove-btn" data-remove="${p.id}" title="Remove from People"><span class="material-symbols-outlined" style="font-size:13px;">person_remove</span></button>
+          <button data-rename="${p.id}" title="Rename for you only">✎</button>
+          <button class="remove-btn" data-remove="${p.id}" title="Remove from People">🗑</button>
         </div>` : ''}
     </div>`).join('');
   el.querySelectorAll('button.person-btn').forEach(b=>b.onclick=async ()=>{
@@ -495,6 +436,19 @@ async function renderDetail(){
   entries.forEach(e=>{ map[`${e.day}|${e.slot_index}`] = e; });
   const isMine = selectedPersonId === me.id;
 
+  // Show each person's OWN period structure (their count, their times) — not the
+  // viewer's. Only fetch a second time when looking at someone else; your own
+  // SLOTS is already loaded globally.
+  let viewSlots = SLOTS;
+  if (!isMine){
+    try{
+      const res = await Api.getPeriodSettings(selectedPersonId);
+      if (res && Array.isArray(res.slots) && res.slots.length >= 1) viewSlots = res.slots;
+    }catch(e){
+      console.error("Could not load this person's period settings — showing default", e);
+    }
+  }
+
   const toolbar = document.getElementById('builderToolbar');
   toolbar.style.display = isMine ? '' : 'none';
 
@@ -504,9 +458,9 @@ async function renderDetail(){
     document.getElementById('subjectSuggestions').innerHTML = subjects.map(s=>`<option value="${s}">`).join('');
   }
 
-  let thead = '<tr><th>Day</th>' + SLOTS.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
+  let thead = '<tr><th>Day</th>' + viewSlots.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
   let rows = DAYS.map(day=>{
-    const cells = SLOTS.map((s,i)=>{
+    const cells = viewSlots.map((s,i)=>{
       const e = map[`${day}|${i}`];
       const label = e ? e.label : 'Not set';
       const isFree = e ? e.is_free : false;
@@ -593,9 +547,7 @@ function renderTogetherSelect(){
   const el = document.getElementById('togetherSelect');
   el.innerHTML = board.map(p=>`
     <label class="who-chip ${togetherPicked.has(p.id)?'on':''}">
-      <input type="checkbox" data-id="${p.id}" ${togetherPicked.has(p.id)?'checked':''}>
-      <div class="avatar-circle xs">${initials(p.display_name)}</div>
-      ${p.display_name}
+      <input type="checkbox" data-id="${p.id}" ${togetherPicked.has(p.id)?'checked':''}> ${p.display_name}
     </label>`).join('');
   el.querySelectorAll('input').forEach(inp=>{
     inp.onchange = ()=>{
@@ -645,11 +597,13 @@ function injectPeriodSettingsButton(){
   const meBox = document.getElementById('meBox');
   const btn = document.createElement('button');
   btn.id = 'periodSettingsBtn';
-  btn.className = 'icon-btn-circle';
+  btn.className = 'name-edit-btn';
   btn.title = 'Edit period times for your college';
-  btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:19px;">settings</span>';
+  btn.style.marginRight = '10px';
+  btn.style.fontSize = '15px';
+  btn.textContent = '⚙';
   btn.onclick = () => openPeriodSettingsModal();
-  document.getElementById('headerRight').insertBefore(btn, meBox);
+  meBox.parentElement.insertBefore(btn, meBox);
 }
 
 function buildPeriodSettingsModal(){
@@ -661,9 +615,9 @@ function buildPeriodSettingsModal(){
     <div class="modal lg">
       <div class="modal-head">
         <h3>Period times</h3>
-        <button class="modal-close" id="periodSettingsCloseBtn"><span class="material-symbols-outlined" style="font-size:17px;">close</span></button>
+        <button class="modal-close" id="periodSettingsCloseBtn">✕</button>
       </div>
-      <p class="section-sub">Every college runs a different bell schedule — set these once to match yours, and add or remove periods if your day has a different number of them. The default shown here is what FreeBoard ships with (8 periods).</p>
+      <p class="section-sub">This is YOUR own schedule — set your real period times and count here. Friends viewing your timetable will see it exactly as you set it, even if their own schedule looks different.</p>
       <div id="periodSettingsRows"></div>
       <div style="display:flex;gap:8px;margin:6px 0 4px;">
         <button class="btn ghost" id="periodSettingsAddBtn">+ Add period</button>
@@ -715,14 +669,24 @@ function openPeriodSettingsModal(){
 }
 
 async function applyNewSlots(newSlots){
-  SLOTS = newSlots;
-  localStorage.setItem(PERIOD_TIMES_KEY, JSON.stringify(SLOTS));
-  // Refresh everything that reads period times/labels
-  renderBrowseSlotPills();
-  try{ await loadBrowse(); }catch(e){}
-  try{ await loadLive(); }catch(e){}
-  if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
-  showToast('Period times updated');
+  const saveBtn = document.getElementById('periodSettingsSaveBtn');
+  const errEl = document.getElementById('periodSettingsError');
+  if (saveBtn) saveBtn.disabled = true;
+  try{
+    await Api.savePeriodSettings(newSlots); // shared for the whole board, not just this device
+    SLOTS = newSlots;
+    renderBrowseSlotPills();
+    try{ await loadBrowse(); }catch(e){}
+    try{ await loadLive(); }catch(e){}
+    if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
+    showToast('Your period times were updated');
+    return true;
+  }catch(e){
+    if (errEl) errEl.textContent = e.message;
+    return false;
+  }finally{
+    if (saveBtn) saveBtn.disabled = false;
+  }
 }
 
 function wirePeriodSettingsModal(){
@@ -763,8 +727,8 @@ function wirePeriodSettingsModal(){
         if (end <= start){ errEl.textContent = `Period ${i+1}: end time must be after start time.`; return; }
         newSlots.push({ start, end, label: `${to12hLabel(start)} – ${to12hLabel(end)}` });
       }
-      await applyNewSlots(newSlots);
-      document.getElementById('periodSettingsModalBg').classList.remove('show');
+      const ok = await applyNewSlots(newSlots);
+      if (ok) document.getElementById('periodSettingsModalBg').classList.remove('show');
     }
   });
 }
