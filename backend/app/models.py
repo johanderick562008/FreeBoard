@@ -52,3 +52,15 @@ class Connection(Base):
                      nullable=False, default="pending")
     nickname = Column(String(100), nullable=True)  # owner's private label for other_user, only owner sees it
     created_at = Column(DateTime, server_default=func.now())
+
+
+class Ping(Base):
+    """A one-tap 'I'm free too, want to meet up?' nudge between two connected users."""
+    __tablename__ = "pings"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    from_user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    to_user_id = Column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status = Column(Enum("sent", "on_way", "declined", name="ping_status_enum"),
+                     nullable=False, default="sent")
+    created_at = Column(DateTime, server_default=func.now())
