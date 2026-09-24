@@ -48,3 +48,20 @@ class ConnectionOut(BaseModel):
     id: int
     user: UserOut
     nickname: Optional[str] = None
+
+
+class PingOut(BaseModel):
+    id: int
+    user: UserOut
+    status: str
+
+
+class PingRespond(BaseModel):
+    status: str  # "on_way" or "declined"
+
+    @field_validator("status")
+    @classmethod
+    def valid_status(cls, v: str) -> str:
+        if v not in ("on_way", "declined"):
+            raise ValueError("Status must be 'on_way' or 'declined'.")
+        return v
