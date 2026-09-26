@@ -5,10 +5,10 @@ from .config import settings
 
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=1800,
-    pool_size=5,
-    max_overflow=0,
+    pool_size=1,          # serverless: one connection per warm invocation, not a big pool
+    max_overflow=0,       # don't let it try to open extra connections under load
+    pool_pre_ping=False,  # skip the extra round-trip — a fresh/warm connection doesn't need a health check
+    pool_recycle=300,     # recycle before Aiven's own idle-connection timeout kicks in
 )
 
 SessionLocal = sessionmaker(
