@@ -53,7 +53,7 @@ async function boot(){
   if (!me) return;
 
   renderMeBox();
-  setupHeaderExtras();
+  injectPeriodSettingsButton();
   wirePeriodSettingsModal();
   if (new URLSearchParams(location.search).get('setup') || /^user[0-9a-f]{8}$/.test(me.username)){
     document.getElementById('usernameModalBg').classList.add('show');
@@ -69,7 +69,7 @@ async function boot(){
 
   tickClock(); setInterval(tickClock, 1000);
   setInterval(loadLive, 20000);
-  setInterval(loadIncomingRequests, 30000);
+  setInterval(()=>loadIncomingRequests({ quiet: true }), 20000); // new requests show up without a reload or tab click
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
   wireNameModal(); wireNicknameModal(); wireRemoveModal();
@@ -306,32 +306,11 @@ async function loadLive(){
   countEl.textContent = `${data.free.length} / ${data.free.length + data.busy.length} free`;
   heading.textContent = data.free.length ? 'Free right now' : "Nobody's free this period";
   boardEl.innerHTML = data.free.length
-    ? data.free.map((p,i)=>{
-        const canPing = p.user_id !== me.id;
-        return `<div class="flip" style="animation-delay:${i*45}ms">
-          <div class="name">${p.display_name}</div>
-          <div class="tag">Free now</div>
-          ${canPing ? `<button class="ping-btn" data-ping="${p.user_id}" style="margin-top:8px;font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--paper-dim);cursor:pointer;">👋 Ping</button>` : ''}
-        </div>`;
-      }).join('')
+    ? data.free.map((p,i)=>`<div class="flip" style="animation-delay:${i*45}ms"><div class="name">${p.display_name}</div><div class="tag">Free now</div></div>`).join('')
     : '<div class="empty-note">No one on your board is free this period.</div>';
   busyEl.innerHTML = data.busy.length
     ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
     : '<span class="chip free">Nobody — everyone free!</span>';
-
-  boardEl.querySelectorAll('button[data-ping]').forEach(btn=>{
-    btn.onclick = async ()=>{
-      btn.disabled = true;
-      try{
-        await Api.sendPing(parseInt(btn.dataset.ping));
-        btn.textContent = '👋 Pinged';
-        showToast('Ping sent!');
-      }catch(e){
-        btn.disabled = false;
-        showToast(e.message);
-      }
-    };
-  });
 }
 
 /* ---------------- BROWSE ---------------- */
@@ -387,53 +366,19 @@ function wirePeople(){
   loadIncomingRequests();
 }
 
-function ensurePingsBlock(){
-  if (document.getElementById('pingsBlock')) return;
-  const requestsBlock = document.getElementById('requestsBlock');
-  const block = document.createElement('div');
-  block.id = 'pingsBlock';
-  block.style.display = 'none';
-  block.innerHTML = `
-    <div class="example-label" style="margin:14px 0 8px;">Pings waiting on you</div>
-    <div class="search-results" id="pingsList"></div>`;
-  requestsBlock.parentElement.insertBefore(block, requestsBlock.nextSibling);
-}
-
-async function loadIncomingRequests(){
-  ensurePingsBlock();
+async function loadIncomingRequests({ quiet = false } = {}){
   const block = document.getElementById('requestsBlock');
   const list = document.getElementById('requestsList');
-  const [requests, pings] = await Promise.all([Api.incomingRequests(), Api.incomingPings()]);
-  updateBellBadge(requests.length + pings.length);
-
-  const pingsBlock = document.getElementById('pingsBlock');
-  const pingsList = document.getElementById('pingsList');
-  if (!pings.length){ pingsBlock.style.display = 'none'; pingsList.innerHTML=''; }
-  else {
-    pingsBlock.style.display = '';
-    pingsList.innerHTML = pings.map(p=>`
-      <div class="search-row">
-        <span>👋 <b>${p.user.display_name}</b> pinged you — free to meet up?</span>
-        <span style="display:flex;gap:6px;">
-          <button class="btn primary" data-onway="${p.id}">On my way!</button>
-          <button class="btn ghost" data-cantnow="${p.id}">Can't now</button>
-        </span>
-      </div>`).join('');
-    pingsList.querySelectorAll('button[data-onway]').forEach(btn=>{
-      btn.onclick = async ()=>{
-        await Api.respondPing(parseInt(btn.dataset.onway), 'on_way');
-        showToast("Let them know you're on your way!");
-        await loadIncomingRequests();
-      };
-    });
-    pingsList.querySelectorAll('button[data-cantnow]').forEach(btn=>{
-      btn.onclick = async ()=>{
-        await Api.respondPing(parseInt(btn.dataset.cantnow), 'declined');
-        await loadIncomingRequests();
-      };
-    });
+  let requests;
+  try{
+    requests = await Api.incomingRequests();
+  }catch(e){
+    // Was silent before — a failed fetch just meant Accept/Decline never appeared, with no clue why.
+    console.error('Could not load incoming requests', e);
+    if (!quiet) showToast("Couldn't check for requests — " + e.message);
+    return;
   }
-
+  if (!requests) return; // 401: api() already redirected to login
   if (!requests.length){ block.style.display = 'none'; list.innerHTML=''; return; }
   block.style.display = '';
   list.innerHTML = requests.map(r=>`
@@ -446,15 +391,21 @@ async function loadIncomingRequests(){
     </div>`).join('');
   list.querySelectorAll('button[data-accept]').forEach(btn=>{
     btn.onclick = async ()=>{
-      await Api.acceptRequest(parseInt(btn.dataset.accept));
-      showToast('Request accepted');
+      btn.disabled = true;
+      try{
+        await Api.acceptRequest(parseInt(btn.dataset.accept));
+        showToast('Request accepted');
+      }catch(e){ showToast(e.message); }
       await loadIncomingRequests();
     };
   });
   list.querySelectorAll('button[data-decline]').forEach(btn=>{
     btn.onclick = async ()=>{
-      await Api.declineRequest(parseInt(btn.dataset.decline));
-      showToast('Request declined');
+      btn.disabled = true;
+      try{
+        await Api.declineRequest(parseInt(btn.dataset.decline));
+        showToast('Request declined');
+      }catch(e){ showToast(e.message); }
       await loadIncomingRequests();
     };
   });
@@ -645,65 +596,18 @@ function to12hLabel(t24){
   return `${String(h12).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
 
-function setupHeaderExtras(){
-  if (document.getElementById('headerRightCol')) return; // already set up
+function injectPeriodSettingsButton(){
+  if (document.getElementById('periodSettingsBtn')) return; // already injected
   const meBox = document.getElementById('meBox');
-  const header = document.querySelector('header.top');
-
-  // Right side of the header: a profile+settings stack, with the bell sitting
-  // in its own column further right so it lands in the true top-right corner.
-  const row = document.createElement('div');
-  row.id = 'headerRightCol';
-  row.style.cssText = 'display:flex;align-items:flex-start;gap:14px;';
-
-  const profileStack = document.createElement('div');
-  profileStack.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:6px;';
-  profileStack.appendChild(meBox); // moves the existing profile chip in here, doesn't recreate it
-
-  const gearBtn = document.createElement('button');
-  gearBtn.id = 'periodSettingsBtn';
-  gearBtn.className = 'name-edit-btn';
-  gearBtn.title = 'Edit period times for your college';
-  gearBtn.style.cssText = 'font-size:11.5px;display:flex;align-items:center;gap:4px;';
-  gearBtn.innerHTML = '⚙ <span>Period times</span>';
-  gearBtn.onclick = () => openPeriodSettingsModal();
-  profileStack.appendChild(gearBtn); // directly under the profile picture
-
-  const bellWrap = document.createElement('div');
-  bellWrap.style.cssText = 'position:relative;display:inline-flex;margin-top:2px;';
-  const bellBtn = document.createElement('button');
-  bellBtn.id = 'notifBellBtn';
-  bellBtn.className = 'name-edit-btn';
-  bellBtn.title = 'Requests';
-  bellBtn.style.fontSize = '17px';
-  bellBtn.textContent = '🔔';
-  bellBtn.onclick = () => {
-    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    document.querySelector('nav.tabs button[data-tab="people"]').classList.add('active');
-    document.getElementById('panel-people').classList.add('active');
-    loadIncomingRequests();
-  };
-  const badge = document.createElement('span');
-  badge.id = 'notifBellBadge';
-  badge.style.cssText = 'position:absolute;top:-4px;right:-6px;min-width:16px;height:16px;padding:0 4px;background:var(--busy);color:#fff;border-radius:999px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--black);';
-  bellWrap.appendChild(bellBtn);
-  bellWrap.appendChild(badge);
-
-  row.appendChild(profileStack); // profile + settings, left of the bell
-  row.appendChild(bellWrap);      // rightmost — true top-right corner
-  header.appendChild(row); // header.top's only other child is .brand — space-between keeps this cleanly right-aligned
-}
-
-function updateBellBadge(count){
-  const badge = document.getElementById('notifBellBadge');
-  if (!badge) return;
-  if (count > 0){
-    badge.textContent = count > 9 ? '9+' : String(count);
-    badge.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-  }
+  const btn = document.createElement('button');
+  btn.id = 'periodSettingsBtn';
+  btn.className = 'name-edit-btn';
+  btn.title = 'Edit period times for your college';
+  btn.style.marginRight = '10px';
+  btn.style.fontSize = '15px';
+  btn.textContent = '⚙';
+  btn.onclick = () => openPeriodSettingsModal();
+  meBox.parentElement.insertBefore(btn, meBox);
 }
 
 function buildPeriodSettingsModal(){
