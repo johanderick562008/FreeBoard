@@ -70,7 +70,6 @@ async function boot(){
 
   tickClock(); setInterval(tickClock, 1000);
   setInterval(loadLive, 20000);
-  setInterval(()=>loadIncomingRequests({ quiet: true }), 20000); // new requests show up without a reload or tab click
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
   wireNameModal(); wireNicknameModal(); wireRemoveModal();
@@ -367,19 +366,10 @@ function wirePeople(){
   loadIncomingRequests();
 }
 
-async function loadIncomingRequests({ quiet = false } = {}){
+async function loadIncomingRequests(){
   const block = document.getElementById('requestsBlock');
   const list = document.getElementById('requestsList');
-  let requests;
-  try{
-    requests = await Api.incomingRequests();
-  }catch(e){
-    // Was silent before — a failed fetch just meant Accept/Decline never appeared, with no clue why.
-    console.error('Could not load incoming requests', e);
-    if (!quiet) showToast("Couldn't check for requests — " + e.message);
-    return;
-  }
-  if (!requests) return; // 401: api() already redirected to login
+  const requests = await Api.incomingRequests();
   if (!requests.length){ block.style.display = 'none'; list.innerHTML=''; return; }
   block.style.display = '';
   list.innerHTML = requests.map(r=>`
@@ -392,21 +382,15 @@ async function loadIncomingRequests({ quiet = false } = {}){
     </div>`).join('');
   list.querySelectorAll('button[data-accept]').forEach(btn=>{
     btn.onclick = async ()=>{
-      btn.disabled = true;
-      try{
-        await Api.acceptRequest(parseInt(btn.dataset.accept));
-        showToast('Request accepted');
-      }catch(e){ showToast(e.message); }
+      await Api.acceptRequest(parseInt(btn.dataset.accept));
+      showToast('Request accepted');
       await loadIncomingRequests();
     };
   });
   list.querySelectorAll('button[data-decline]').forEach(btn=>{
     btn.onclick = async ()=>{
-      btn.disabled = true;
-      try{
-        await Api.declineRequest(parseInt(btn.dataset.decline));
-        showToast('Request declined');
-      }catch(e){ showToast(e.message); }
+      await Api.declineRequest(parseInt(btn.dataset.decline));
+      showToast('Request declined');
       await loadIncomingRequests();
     };
   });
