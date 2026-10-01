@@ -69,12 +69,6 @@ def send_connection_request(other_user_id: int, db: Session = Depends(get_db), u
         raise HTTPException(status_code=404, detail="User not found.")
     existing = db.query(Connection).filter_by(owner_user_id=user.id, other_user_id=other_user_id).first()
     if existing:
-        if existing.status == "declined":
-            # They declined an earlier request. Asking again must reach them again —
-            # otherwise the old "declined" row just sits there, the sender is told
-            # "request sent", and the receiver never sees an Accept/Decline prompt.
-            existing.status = "pending"
-            db.commit()
         return {"status": existing.status, "user": UserOut.model_validate(target)}
     db.add(Connection(owner_user_id=user.id, other_user_id=other_user_id, status="pending"))
     db.commit()
