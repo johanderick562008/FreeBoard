@@ -45,6 +45,4 @@ const Api = {
   saveTimetable: (cells) => api("/timetable/bulk", { method: "PUT", body: JSON.stringify({ cells }) }),
   live: (day, slotIndex) => api(`/schedule/live?day=${day}&slot_index=${slotIndex}`),
   together: (ids) => api(`/schedule/together?user_ids=${ids.join(",")}`),
-  getPeriods: () => api("/settings/periods"),
-  setPeriods: (slots) => api("/settings/periods", { method: "PUT", body: JSON.stringify({ slots }) }),
 };
