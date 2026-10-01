@@ -12,19 +12,18 @@ let SLOTS = [
 
 
 const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
-const PERIOD_TIMES_KEY = 'freeboard-period-times';
 
-function loadSavedSlots(){
+// Period times are one shared setting for the whole college (backend: /settings/periods),
+// not a per-browser preference — otherwise everyone sees a different "default" timetable,
+// including when viewing someone else's schedule. Loaded fresh in boot(), before anything renders.
+async function loadSharedPeriods(){
   try{
-    const raw = localStorage.getItem(PERIOD_TIMES_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 16) return parsed;
-  }catch(e){ /* ignore malformed storage, fall back to defaults */ }
-  return null;
+    const data = await Api.getPeriods();
+    if (Array.isArray(data.slots) && data.slots.length >= 1) SLOTS = data.slots;
+  }catch(e){
+    console.error('Could not load shared period times, using the built-in default', e);
+  }
 }
-const savedSlots = loadSavedSlots();
-if (savedSlots) SLOTS = savedSlots; // different college's period times, saved on an earlier visit
 
 let me = null;
 let board = [];          // my connections + me
@@ -52,6 +51,8 @@ async function boot(){
   try{ me = await Api.me(); }catch(e){ window.location.href = 'index.html'; return; }
   if (!me) return;
 
+  await loadSharedPeriods(); // before any timetable renders, so every table (yours and others') uses the real shared times
+
   renderMeBox();
   injectPeriodSettingsButton();
   wirePeriodSettingsModal();
@@ -69,6 +70,7 @@ async function boot(){
 
   tickClock(); setInterval(tickClock, 1000);
   setInterval(loadLive, 20000);
+  setInterval(()=>loadIncomingRequests({ quiet: true }), 20000); // new requests show up without a reload or tab click
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
   wireNameModal(); wireNicknameModal(); wireRemoveModal();
@@ -365,10 +367,19 @@ function wirePeople(){
   loadIncomingRequests();
 }
 
-async function loadIncomingRequests(){
+async function loadIncomingRequests({ quiet = false } = {}){
   const block = document.getElementById('requestsBlock');
   const list = document.getElementById('requestsList');
-  const requests = await Api.incomingRequests();
+  let requests;
+  try{
+    requests = await Api.incomingRequests();
+  }catch(e){
+    // Was silent before — a failed fetch just meant Accept/Decline never appeared, with no clue why.
+    console.error('Could not load incoming requests', e);
+    if (!quiet) showToast("Couldn't check for requests — " + e.message);
+    return;
+  }
+  if (!requests) return; // 401: api() already redirected to login
   if (!requests.length){ block.style.display = 'none'; list.innerHTML=''; return; }
   block.style.display = '';
   list.innerHTML = requests.map(r=>`
@@ -381,15 +392,21 @@ async function loadIncomingRequests(){
     </div>`).join('');
   list.querySelectorAll('button[data-accept]').forEach(btn=>{
     btn.onclick = async ()=>{
-      await Api.acceptRequest(parseInt(btn.dataset.accept));
-      showToast('Request accepted');
+      btn.disabled = true;
+      try{
+        await Api.acceptRequest(parseInt(btn.dataset.accept));
+        showToast('Request accepted');
+      }catch(e){ showToast(e.message); }
       await loadIncomingRequests();
     };
   });
   list.querySelectorAll('button[data-decline]').forEach(btn=>{
     btn.onclick = async ()=>{
-      await Api.declineRequest(parseInt(btn.dataset.decline));
-      showToast('Request declined');
+      btn.disabled = true;
+      try{
+        await Api.declineRequest(parseInt(btn.dataset.decline));
+        showToast('Request declined');
+      }catch(e){ showToast(e.message); }
       await loadIncomingRequests();
     };
   });
@@ -657,14 +674,14 @@ function openPeriodSettingsModal(){
 }
 
 async function applyNewSlots(newSlots){
+  await Api.setPeriods(newSlots); // shared for everyone — throws on failure, caller shows the error
   SLOTS = newSlots;
-  localStorage.setItem(PERIOD_TIMES_KEY, JSON.stringify(SLOTS));
   // Refresh everything that reads period times/labels
   renderBrowseSlotPills();
   try{ await loadBrowse(); }catch(e){}
   try{ await loadLive(); }catch(e){}
   if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
-  showToast('Period times updated');
+  showToast('Period times updated for everyone');
 }
 
 function wirePeriodSettingsModal(){
@@ -705,7 +722,12 @@ function wirePeriodSettingsModal(){
         if (end <= start){ errEl.textContent = `Period ${i+1}: end time must be after start time.`; return; }
         newSlots.push({ start, end, label: `${to12hLabel(start)} – ${to12hLabel(end)}` });
       }
-      await applyNewSlots(newSlots);
+      try{
+        await applyNewSlots(newSlots);
+      }catch(err){
+        errEl.textContent = err.message;
+        return;
+      }
       document.getElementById('periodSettingsModalBg').classList.remove('show');
     }
   });
