@@ -13,15 +13,16 @@ let SLOTS = [
 
 const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
 
-// Period times are one shared setting for the whole college (backend: /settings/periods),
-// not a per-browser preference — otherwise everyone sees a different "default" timetable,
-// including when viewing someone else's schedule. Loaded fresh in boot(), before anything renders.
-async function loadSharedPeriods(){
+// Period times are per-person (backend: /settings/periods/{user_id}), not one shared
+// setting — each person can run a different structure. SLOTS here holds MY OWN
+// periods, used for my own timetable and as the reference for Live/Browse/Together.
+// Viewing someone else's timetable fetches THEIR periods separately — see renderDetail().
+async function loadMyPeriods(){
   try{
-    const data = await Api.getPeriods();
+    const data = await Api.getPeriods(me.id);
     if (Array.isArray(data.slots) && data.slots.length >= 1) SLOTS = data.slots;
   }catch(e){
-    console.error('Could not load shared period times, using the built-in default', e);
+    console.error('Could not load your period times, using the built-in default', e);
   }
 }
 
@@ -51,7 +52,7 @@ async function boot(){
   try{ me = await Api.me(); }catch(e){ window.location.href = 'index.html'; return; }
   if (!me) return;
 
-  await loadSharedPeriods(); // before any timetable renders, so every table (yours and others') uses the real shared times
+  await loadMyPeriods(); // before any timetable renders — SLOTS = my own periods
 
   renderMeBox();
   injectPeriodSettingsButton();
@@ -433,10 +434,24 @@ async function renderDetail(){
   const person = board.find(p=>p.id===selectedPersonId);
   document.getElementById('detailName').textContent = person.display_name;
 
+  const isMine = selectedPersonId === me.id;
+
+  // Each person's table is read using THEIR OWN period structure — their saved
+  // timetable entries' slot_index values only make sense against their own periods,
+  // not mine. My own view keeps using the global SLOTS (my periods), loaded in boot().
+  let viewSlots = SLOTS;
+  if (!isMine){
+    try{
+      const data = await Api.getPeriods(selectedPersonId);
+      if (Array.isArray(data.slots) && data.slots.length >= 1) viewSlots = data.slots;
+    }catch(e){
+      console.error("Could not load this person's period times, showing yours instead", e);
+    }
+  }
+
   const entries = await Api.getTimetable(selectedPersonId);
   const map = {};
   entries.forEach(e=>{ map[`${e.day}|${e.slot_index}`] = e; });
-  const isMine = selectedPersonId === me.id;
 
   const toolbar = document.getElementById('builderToolbar');
   toolbar.style.display = isMine ? '' : 'none';
@@ -447,9 +462,9 @@ async function renderDetail(){
     document.getElementById('subjectSuggestions').innerHTML = subjects.map(s=>`<option value="${s}">`).join('');
   }
 
-  let thead = '<tr><th>Day</th>' + SLOTS.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
+  let thead = '<tr><th>Day</th>' + viewSlots.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
   let rows = DAYS.map(day=>{
-    const cells = SLOTS.map((s,i)=>{
+    const cells = viewSlots.map((s,i)=>{
       const e = map[`${day}|${i}`];
       const label = e ? e.label : 'Not set';
       const isFree = e ? e.is_free : false;
