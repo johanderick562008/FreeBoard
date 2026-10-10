@@ -61,14 +61,6 @@ async function boot(){
     document.getElementById('usernameModalBg').classList.add('show');
   }
 
-  try{
-    await refreshBoard();
-  }catch(e){
-    console.error('refreshBoard failed — is the backend running the latest schema/migration?', e);
-    board = [{ id: me.id, username: me.username, display_name: me.display_name + ' (you)' }];
-    showToast("Couldn't load your board — check the backend console");
-  }
-
   tickClock(); setInterval(tickClock, 1000);
   setInterval(loadLive, 20000);
 
@@ -81,17 +73,30 @@ async function boot(){
   const idx = currentSlotIndex(now);
   selectedSlot = idx !== -1 ? idx : 0;
 
-  try{ renderBrowseDayPills(); renderBrowseSlotPills(); await loadBrowse(); }
-  catch(e){ console.error('Browse failed to load', e); }
+  renderBrowseDayPills(); renderBrowseSlotPills();
+
+  // refreshBoard / loadBrowse / loadLive don't depend on each other's results —
+  // firing them together instead of one-at-a-time is what was making first load slow
+  // (each round trip to the DB was waiting for the previous one to fully finish).
+  const [boardResult, browseResult, liveResult] = await Promise.allSettled([
+    refreshBoard(),
+    loadBrowse(),
+    loadLive(),
+  ]);
+
+  if (boardResult.status === 'rejected'){
+    console.error('refreshBoard failed — is the backend running the latest schema/migration?', boardResult.reason);
+    board = [{ id: me.id, username: me.username, display_name: me.display_name + ' (you)' }];
+    showToast("Couldn't load your board — check the backend console");
+  }
+  if (browseResult.status === 'rejected') console.error('Browse failed to load', browseResult.reason);
+  if (liveResult.status === 'rejected') console.error('Live tab failed to load', liveResult.reason);
 
   try{ renderPeopleGrid(); }
   catch(e){ console.error('People grid failed to render', e); }
 
   try{ renderTogetherSelect(); await renderTogetherResults(); }
   catch(e){ console.error('Together tab failed to load', e); }
-
-  try{ await loadLive(); }
-  catch(e){ console.error('Live tab failed to load', e); }
 }
 
 function renderMeBox(){
@@ -566,16 +571,24 @@ async function renderDetail(){
   // timetable entries' slot_index values only make sense against their own periods,
   // not mine. My own view keeps using the global SLOTS (my periods), loaded in boot().
   let viewSlots = SLOTS;
+  let entries;
   if (!isMine){
-    try{
-      const data = await Api.getPeriods(selectedPersonId);
-      if (Array.isArray(data.slots) && data.slots.length >= 1) viewSlots = data.slots;
-    }catch(e){
-      console.error("Could not load this person's period times, showing yours instead", e);
+    // Periods and timetable entries don't depend on each other — fetch both at once
+    // instead of waiting for periods to finish before even starting the timetable fetch.
+    const [periodsResult, entriesResult] = await Promise.allSettled([
+      Api.getPeriods(selectedPersonId),
+      Api.getTimetable(selectedPersonId),
+    ]);
+    if (periodsResult.status === 'fulfilled' && Array.isArray(periodsResult.value.slots) && periodsResult.value.slots.length >= 1){
+      viewSlots = periodsResult.value.slots;
+    } else if (periodsResult.status === 'rejected'){
+      console.error("Could not load this person's period times, showing yours instead", periodsResult.reason);
     }
+    entries = entriesResult.status === 'fulfilled' ? entriesResult.value : [];
+    if (entriesResult.status === 'rejected') console.error("Could not load this person's timetable", entriesResult.reason);
+  } else {
+    entries = await Api.getTimetable(selectedPersonId);
   }
-
-  const entries = await Api.getTimetable(selectedPersonId);
   const map = {};
   entries.forEach(e=>{ map[`${e.day}|${e.slot_index}`] = e; });
 
