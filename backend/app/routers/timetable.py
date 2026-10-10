@@ -31,14 +31,6 @@ def save_bulk(body: TimetableBulkUpdate, db: Session = Depends(get_db), user: Us
     return {"status": "saved", "count": len(body.cells)}
 
 
-@router.delete("/clear")
-def clear_timetable(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Wipes every timetable entry for the current user (e.g. starting a new semester)."""
-    deleted = db.query(TimetableEntry).filter_by(user_id=user.id).delete()
-    db.commit()
-    return {"status": "cleared", "count": deleted}
-
-
 def _visible_or_404(db: Session, viewer: User, target_id: int) -> User:
     target = db.query(User).filter(User.id == target_id).first()
     if not target:
