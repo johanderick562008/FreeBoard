@@ -12,10 +12,18 @@ MAX_SLOTS = 16  # generous ceiling — colleges can add/remove periods, this jus
 
 
 def _my_board(db: Session, user: User) -> list[User]:
-    """Everyone whose timetable this user is allowed to see on their board: themself + accepted connections."""
-    rows = db.query(Connection).filter_by(owner_user_id=user.id, status="accepted").all()
-    ids = [r.other_user_id for r in rows] + [user.id]
-    return db.query(User).filter(User.id.in_(ids)).all()
+    """Everyone whose timetable this user is allowed to see on their board: themself + accepted connections.
+    One joined query instead of two separate round trips (connections, then users) — this ran on
+    every Live/Browse/Together request, so the extra round trip was pure added latency each time."""
+    connected = (
+        db.query(User)
+        .join(Connection, Connection.other_user_id == User.id)
+        .filter(Connection.owner_user_id == user.id, Connection.status == "accepted")
+        .all()
+    )
+    if user.id not in {u.id for u in connected}:
+        connected.append(user)
+    return connected
 
 
 def _status_map(db: Session, people_ids: list[int]) -> dict:
