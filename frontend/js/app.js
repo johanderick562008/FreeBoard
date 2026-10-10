@@ -12,19 +12,19 @@ let SLOTS = [
 
 
 const DEFAULT_SLOTS = SLOTS.map(s => ({...s}));
-const PERIOD_TIMES_KEY = 'freeboard-period-times';
 
-function loadSavedSlots(){
+// Period times are per-person (backend: /settings/periods/{user_id}), not one shared
+// setting — each person can run a different structure. SLOTS here holds MY OWN
+// periods, used for my own timetable and as the reference for Live/Browse/Together.
+// Viewing someone else's timetable fetches THEIR periods separately — see renderDetail().
+async function loadMyPeriods(){
   try{
-    const raw = localStorage.getItem(PERIOD_TIMES_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length >= 1 && parsed.length <= 16) return parsed;
-  }catch(e){ /* ignore malformed storage, fall back to defaults */ }
-  return null;
+    const data = await Api.getPeriods(me.id);
+    if (Array.isArray(data.slots) && data.slots.length >= 1) SLOTS = data.slots;
+  }catch(e){
+    console.error('Could not load your period times, using the built-in default', e);
+  }
 }
-const savedSlots = loadSavedSlots();
-if (savedSlots) SLOTS = savedSlots; // different college's period times, saved on an earlier visit
 
 let me = null;
 let board = [];          // my connections + me
@@ -52,6 +52,8 @@ async function boot(){
   try{ me = await Api.me(); }catch(e){ window.location.href = 'index.html'; return; }
   if (!me) return;
 
+  await loadMyPeriods(); // before any timetable renders — SLOTS = my own periods
+
   renderMeBox();
   injectPeriodSettingsButton();
   wirePeriodSettingsModal();
@@ -71,7 +73,7 @@ async function boot(){
   setInterval(loadLive, 20000);
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
-  wireNameModal(); wireNicknameModal(); wireRemoveModal(); wireClearTimetableModal();
+  wireNameModal(); wireNicknameModal(); wireRemoveModal();
 
   const now = new Date();
   const todayName = now.toLocaleDateString('en-US',{weekday:'long'});
@@ -242,38 +244,6 @@ function wireRemoveModal(){
       err.textContent = e.message;
     }finally{
       confirmBtn.disabled = false; confirmBtn.textContent = 'Remove';
-    }
-  };
-}
-
-function openClearTimetableModal(){
-  document.getElementById('clearTimetableError').textContent = '';
-  openModalBg('clearTimetableModalBg');
-}
-
-function wireClearTimetableModal(){
-  const bg = document.getElementById('clearTimetableModalBg');
-  const confirmBtn = document.getElementById('clearTimetableConfirmBtn');
-  const cancel = ()=> closeModalBg('clearTimetableModalBg');
-  document.getElementById('clearTimetableCancelBtn').onclick = cancel; // "No" — do nothing
-  document.getElementById('clearTimetableCloseBtn').onclick = cancel;
-  bg.addEventListener('click', (e)=>{ if (e.target === bg) cancel(); });
-
-  confirmBtn.onclick = async ()=>{ // "Yes" — wipe it
-    const err = document.getElementById('clearTimetableError');
-    err.textContent = '';
-    confirmBtn.disabled = true; confirmBtn.textContent = 'Clearing…';
-    try{
-      await Api.clearTimetable();
-      selectedCells.clear();
-      cancel();
-      showToast('Timetable cleared');
-      await renderDetail();
-      loadLive(); loadBrowse(); renderTogetherResults();
-    }catch(e){
-      err.textContent = e.message;
-    }finally{
-      confirmBtn.disabled = false; confirmBtn.textContent = 'Yes, clear it';
     }
   };
 }
@@ -464,10 +434,24 @@ async function renderDetail(){
   const person = board.find(p=>p.id===selectedPersonId);
   document.getElementById('detailName').textContent = person.display_name;
 
+  const isMine = selectedPersonId === me.id;
+
+  // Each person's table is read using THEIR OWN period structure — their saved
+  // timetable entries' slot_index values only make sense against their own periods,
+  // not mine. My own view keeps using the global SLOTS (my periods), loaded in boot().
+  let viewSlots = SLOTS;
+  if (!isMine){
+    try{
+      const data = await Api.getPeriods(selectedPersonId);
+      if (Array.isArray(data.slots) && data.slots.length >= 1) viewSlots = data.slots;
+    }catch(e){
+      console.error("Could not load this person's period times, showing yours instead", e);
+    }
+  }
+
   const entries = await Api.getTimetable(selectedPersonId);
   const map = {};
   entries.forEach(e=>{ map[`${e.day}|${e.slot_index}`] = e; });
-  const isMine = selectedPersonId === me.id;
 
   const toolbar = document.getElementById('builderToolbar');
   toolbar.style.display = isMine ? '' : 'none';
@@ -478,9 +462,9 @@ async function renderDetail(){
     document.getElementById('subjectSuggestions').innerHTML = subjects.map(s=>`<option value="${s}">`).join('');
   }
 
-  let thead = '<tr><th>Day</th>' + SLOTS.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
+  let thead = '<tr><th>Day</th>' + viewSlots.map(s=>`<th>${s.label}</th>`).join('') + '</tr>';
   let rows = DAYS.map(day=>{
-    const cells = SLOTS.map((s,i)=>{
+    const cells = viewSlots.map((s,i)=>{
       const e = map[`${day}|${i}`];
       const label = e ? e.label : 'Not set';
       const isFree = e ? e.is_free : false;
@@ -559,7 +543,6 @@ function wireBuilderToolbar(){
     document.querySelectorAll('#detailTable td.cell.sel-cell').forEach(td=>td.classList.remove('sel-cell'));
     updateSelectionCount();
   };
-  document.getElementById('clearAllTimetableBtn').onclick = ()=> openClearTimetableModal();
   subjectInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') applySelection(); });
 }
 
@@ -690,14 +673,14 @@ function openPeriodSettingsModal(){
 }
 
 async function applyNewSlots(newSlots){
+  await Api.setPeriods(newSlots); // shared for everyone — throws on failure, caller shows the error
   SLOTS = newSlots;
-  localStorage.setItem(PERIOD_TIMES_KEY, JSON.stringify(SLOTS));
   // Refresh everything that reads period times/labels
   renderBrowseSlotPills();
   try{ await loadBrowse(); }catch(e){}
   try{ await loadLive(); }catch(e){}
   if (selectedPersonId){ try{ await renderDetail(); }catch(e){} }
-  showToast('Period times updated');
+  showToast('Period times updated for everyone');
 }
 
 function wirePeriodSettingsModal(){
@@ -738,7 +721,12 @@ function wirePeriodSettingsModal(){
         if (end <= start){ errEl.textContent = `Period ${i+1}: end time must be after start time.`; return; }
         newSlots.push({ start, end, label: `${to12hLabel(start)} – ${to12hLabel(end)}` });
       }
-      await applyNewSlots(newSlots);
+      try{
+        await applyNewSlots(newSlots);
+      }catch(err){
+        errEl.textContent = err.message;
+        return;
+      }
       document.getElementById('periodSettingsModalBg').classList.remove('show');
     }
   });
