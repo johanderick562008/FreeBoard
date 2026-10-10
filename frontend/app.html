@@ -78,6 +78,7 @@
           <button class="btn primary" id="applyBtn">Apply to selected</button>
           <button class="btn ghost" id="markFreeBtn">Mark Free</button>
           <button class="btn ghost" id="clearSelectionBtn">Clear</button>
+          <button class="btn danger" id="clearAllTimetableBtn" style="margin-left:auto;">Clear All</button>
         </div>
         <div class="builder-hint" id="selectionCount">Tap cells to select</div>
       </div>
@@ -161,6 +162,55 @@
     <div class="modal-actions">
       <button class="btn ghost" id="removePersonCancelBtn">Cancel</button>
       <button class="btn danger" id="removePersonConfirmBtn">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- clear all timetable confirmation -->
+<div class="modal-bg" id="clearTimetableModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Clear your timetable?</h3>
+      <button class="modal-close" id="clearTimetableCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <p class="section-sub">Do you want to clear your timetable? This will remove every subject and free slot you've set, so you can start fresh for a new semester. This can't be undone.</p>
+    <div class="modal-error" id="clearTimetableError"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="clearTimetableCancelBtn">No</button>
+      <button class="btn danger" id="clearTimetableConfirmBtn">Yes, clear it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Saturday: holiday or working day? -->
+<div class="modal-bg" id="saturdayModeModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Is today a working Saturday?</h3>
+      <button class="modal-close" id="saturdayModeCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <p class="section-sub">Your college doesn't have a fixed Saturday timetable. Is today a holiday, or a working day?</p>
+    <div class="modal-actions">
+      <button class="btn ghost" id="saturdayHolidayBtn">Holiday</button>
+      <button class="btn primary" id="saturdayWorkingBtn">Working day</button>
+    </div>
+  </div>
+</div>
+
+<!-- Saturday: which day's timetable is it following? -->
+<div class="modal-bg" id="saturdayDayPickModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Which day's timetable?</h3>
+      <button class="modal-close" id="saturdayDayPickCloseBtn" aria-label="Close">✕</button>
+    </div>
+    <p class="section-sub">Select the weekday timetable today's classes are following.</p>
+    <div class="modal-actions" id="saturdayDayPickButtons" style="flex-wrap:wrap;justify-content:flex-start;">
+      <button class="btn ghost" data-pick-day="Monday">Monday</button>
+      <button class="btn ghost" data-pick-day="Tuesday">Tuesday</button>
+      <button class="btn ghost" data-pick-day="Wednesday">Wednesday</button>
+      <button class="btn ghost" data-pick-day="Thursday">Thursday</button>
+      <button class="btn ghost" data-pick-day="Friday">Friday</button>
     </div>
   </div>
 </div>
