@@ -90,28 +90,28 @@ def remove_connection(other_user_id: int, db: Session = Depends(get_db), user: U
 
 @router.get("/connections", response_model=list[ConnectionOut])
 def list_connections(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """My board — only accepted requests, with my private nickname for each person if I set one."""
-    rows = db.query(Connection).filter_by(owner_user_id=user.id, status="accepted").all()
-    if not rows:
-        return []
-    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_([r.other_user_id for r in rows])).all()}
-    return [
-        ConnectionOut(id=r.id, user=UserOut.model_validate(users_by_id[r.other_user_id]), nickname=r.nickname)
-        for r in rows if r.other_user_id in users_by_id
-    ]
+    """My board — only accepted requests, with my private nickname for each person if I set one.
+    One joined query instead of two round trips (connections, then users)."""
+    rows = (
+        db.query(Connection, User)
+        .join(User, User.id == Connection.other_user_id)
+        .filter(Connection.owner_user_id == user.id, Connection.status == "accepted")
+        .all()
+    )
+    return [ConnectionOut(id=conn.id, user=UserOut.model_validate(u), nickname=conn.nickname) for conn, u in rows]
 
 
 @router.get("/connections/incoming")
 def list_incoming_requests(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Requests other people have sent ME, waiting on my accept/decline."""
-    rows = db.query(Connection).filter_by(other_user_id=user.id, status="pending").all()
-    if not rows:
-        return []
-    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_([r.owner_user_id for r in rows])).all()}
-    return [
-        {"request_id": r.id, "user": UserOut.model_validate(users_by_id[r.owner_user_id])}
-        for r in rows if r.owner_user_id in users_by_id
-    ]
+    """Requests other people have sent ME, waiting on my accept/decline.
+    One joined query instead of two round trips (connections, then users)."""
+    rows = (
+        db.query(Connection, User)
+        .join(User, User.id == Connection.owner_user_id)
+        .filter(Connection.other_user_id == user.id, Connection.status == "pending")
+        .all()
+    )
+    return [{"request_id": conn.id, "user": UserOut.model_validate(u)} for conn, u in rows]
 
 
 @router.post("/connections/requests/{request_id}/accept")
