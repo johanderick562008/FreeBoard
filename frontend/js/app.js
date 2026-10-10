@@ -73,7 +73,7 @@ async function boot(){
   setInterval(loadLive, 20000);
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
-  wireNameModal(); wireNicknameModal(); wireRemoveModal();
+  wireNameModal(); wireNicknameModal(); wireRemoveModal(); wireClearTimetableModal(); wireSaturdayModals();
 
   const now = new Date();
   const todayName = now.toLocaleDateString('en-US',{weekday:'long'});
@@ -248,6 +248,38 @@ function wireRemoveModal(){
   };
 }
 
+function openClearTimetableModal(){
+  document.getElementById('clearTimetableError').textContent = '';
+  openModalBg('clearTimetableModalBg');
+}
+
+function wireClearTimetableModal(){
+  const bg = document.getElementById('clearTimetableModalBg');
+  const confirmBtn = document.getElementById('clearTimetableConfirmBtn');
+  const cancel = ()=> closeModalBg('clearTimetableModalBg');
+  document.getElementById('clearTimetableCancelBtn').onclick = cancel; // "No" — do nothing
+  document.getElementById('clearTimetableCloseBtn').onclick = cancel;
+  bg.addEventListener('click', (e)=>{ if (e.target === bg) cancel(); });
+
+  confirmBtn.onclick = async ()=>{ // "Yes" — wipe it
+    const err = document.getElementById('clearTimetableError');
+    err.textContent = '';
+    confirmBtn.disabled = true; confirmBtn.textContent = 'Clearing…';
+    try{
+      await Api.clearTimetable();
+      selectedCells.clear();
+      cancel();
+      showToast('Timetable cleared');
+      await renderDetail();
+      loadLive(); loadBrowse(); renderTogetherResults();
+    }catch(e){
+      err.textContent = e.message;
+    }finally{
+      confirmBtn.disabled = false; confirmBtn.textContent = 'Yes, clear it';
+    }
+  };
+}
+
 function tickClock(){
   const now = new Date();
   document.getElementById('clockLine').textContent =
@@ -282,6 +314,27 @@ function wireTabs(){
 }
 
 /* ---------------- LIVE ---------------- */
+
+/* Most colleges (including ours) don't run a fixed Saturday timetable — a working
+   Saturday just follows one weekday's schedule. We ask once per Saturday and
+   remember the answer in localStorage, keyed to that date, so it doesn't ask again
+   on every 20s refresh or page reload the same day. */
+const SATURDAY_MODE_KEY = 'freeboard-saturday-mode';
+let saturdayAwaitingDayPick = false; // true while the day-picker modal is open, so the holiday/working modal doesn't pop back over it
+
+function getSaturdayChoice(now){
+  try{
+    const raw = localStorage.getItem(SATURDAY_MODE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.date === now.toDateString()) return parsed; // {date, mode:'holiday'} or {date, mode:'working', followDay:'Monday'}
+  }catch(e){ /* ignore malformed storage */ }
+  return null;
+}
+function setSaturdayChoice(now, choice){
+  try{ localStorage.setItem(SATURDAY_MODE_KEY, JSON.stringify({ date: now.toDateString(), ...choice })); }catch(e){}
+}
+
 async function loadLive(){
   const now = new Date();
   const dayName = now.toLocaleDateString('en-US',{weekday:'long'});
@@ -289,11 +342,43 @@ async function loadLive(){
         heading=document.getElementById('liveHeading'), boardEl=document.getElementById('liveBoard'),
         busyEl=document.getElementById('liveBusy'), countEl=document.getElementById('liveCount');
 
+  if (dayName === 'Saturday'){
+    const choice = getSaturdayChoice(now);
+
+    if (!choice){
+      if (!saturdayAwaitingDayPick) openSaturdayModeModal();
+      badge.textContent='—'; badge.classList.add('off');
+      slotLine.textContent='Waiting for today\'s schedule…'; heading.textContent='Is today a working Saturday?';
+      boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent='';
+      return;
+    }
+
+    if (choice.mode === 'holiday'){
+      badge.textContent='HOLIDAY'; badge.classList.add('off');
+      slotLine.textContent='No classes today'; heading.textContent='Enjoy your holiday 🎉';
+      boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
+    }
+
+    // Working Saturday — fetch and show the picked weekday's schedule, but label it as Saturday.
+    await renderLiveForDay(now, choice.followDay, dayName);
+    return;
+  }
+
   if (!DAYS.includes(dayName)){
     badge.textContent='WEEKEND'; badge.classList.add('off');
     slotLine.textContent='No classes today'; heading.textContent="It's the weekend 🎉";
     boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
   }
+
+  await renderLiveForDay(now, dayName, dayName);
+}
+
+/* scheduleDay = whose timetable to query (e.g. "Monday" on a working Saturday); displayDay = what's shown to the user */
+async function renderLiveForDay(now, scheduleDay, displayDay){
+  const badge=document.getElementById('liveBadge'), slotLine=document.getElementById('liveSlotLine'),
+        heading=document.getElementById('liveHeading'), boardEl=document.getElementById('liveBoard'),
+        busyEl=document.getElementById('liveBusy'), countEl=document.getElementById('liveCount');
+
   const idx = currentSlotIndex(now);
   if (idx === -1){
     badge.textContent='BREAK'; badge.classList.add('off');
@@ -301,9 +386,11 @@ async function loadLive(){
     boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
   }
   badge.textContent='CLASSES ON'; badge.classList.remove('off');
-  slotLine.innerHTML = `${dayName} · <b>${SLOTS[idx].label}</b>`;
+  const followNote = scheduleDay !== displayDay
+    ? ` <span style="opacity:.65;font-size:.85em;">(following ${scheduleDay}'s timetable)</span>` : '';
+  slotLine.innerHTML = `${displayDay} · <b>${SLOTS[idx].label}</b>${followNote}`;
 
-  const data = await Api.live(dayName, idx);
+  const data = await Api.live(scheduleDay, idx);
   countEl.textContent = `${data.free.length} / ${data.free.length + data.busy.length} free`;
   heading.textContent = data.free.length ? 'Free right now' : "Nobody's free this period";
   boardEl.innerHTML = data.free.length
@@ -312,6 +399,45 @@ async function loadLive(){
   busyEl.innerHTML = data.busy.length
     ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
     : '<span class="chip free">Nobody — everyone free!</span>';
+}
+
+function openSaturdayModeModal(){
+  openModalBg('saturdayModeModalBg');
+}
+
+function wireSaturdayModals(){
+  const modeModal = 'saturdayModeModalBg', pickModal = 'saturdayDayPickModalBg';
+
+  const closeMode = ()=> closeModalBg(modeModal);
+  document.getElementById('saturdayModeCloseBtn').onclick = closeMode;
+  document.getElementById(modeModal).addEventListener('click', (e)=>{ if (e.target.id === modeModal) closeMode(); });
+
+  document.getElementById('saturdayHolidayBtn').onclick = ()=>{
+    setSaturdayChoice(new Date(), { mode: 'holiday' });
+    closeMode();
+    loadLive();
+  };
+  document.getElementById('saturdayWorkingBtn').onclick = ()=>{
+    saturdayAwaitingDayPick = true;
+    closeMode();
+    openModalBg(pickModal);
+  };
+
+  const closePick = ()=>{
+    saturdayAwaitingDayPick = false; // nothing chosen yet — let it ask again on the next refresh
+    closeModalBg(pickModal);
+  };
+  document.getElementById('saturdayDayPickCloseBtn').onclick = closePick;
+  document.getElementById(pickModal).addEventListener('click', (e)=>{ if (e.target.id === pickModal) closePick(); });
+
+  document.getElementById('saturdayDayPickButtons').querySelectorAll('button[data-pick-day]').forEach(btn=>{
+    btn.onclick = ()=>{
+      saturdayAwaitingDayPick = false;
+      setSaturdayChoice(new Date(), { mode: 'working', followDay: btn.dataset.pickDay });
+      closeModalBg(pickModal);
+      loadLive();
+    };
+  });
 }
 
 /* ---------------- BROWSE ---------------- */
@@ -543,6 +669,7 @@ function wireBuilderToolbar(){
     document.querySelectorAll('#detailTable td.cell.sel-cell').forEach(td=>td.classList.remove('sel-cell'));
     updateSelectionCount();
   };
+  document.getElementById('clearAllTimetableBtn').onclick = ()=> openClearTimetableModal();
   subjectInput.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') applySelection(); });
 }
 
