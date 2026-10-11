@@ -66,6 +66,7 @@ async function boot(){
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
   wireNameModal(); wireNicknameModal(); wireRemoveModal(); wireClearTimetableModal(); wireSaturdayModals();
+  wireTogetherControls();
 
   const now = new Date();
   const todayName = now.toLocaleDateString('en-US',{weekday:'long'});
@@ -687,6 +688,19 @@ function wireBuilderToolbar(){
 }
 
 /* ---------------- TOGETHER ---------------- */
+function wireTogetherControls(){
+  document.getElementById('togetherSelectAllBtn').onclick = ()=>{
+    board.forEach(p=> togetherPicked.add(p.id));
+    renderTogetherSelect(); renderTogetherResults();
+  };
+  document.getElementById('togetherDeselectAllBtn').onclick = ()=>{
+    // Clears everything, not just whatever Select All added — so checking 2-3 people
+    // by hand and then hitting Deselect wipes those too, same as the Select All case.
+    togetherPicked.clear();
+    renderTogetherSelect(); renderTogetherResults();
+  };
+}
+
 function renderTogetherSelect(){
   const el = document.getElementById('togetherSelect');
   el.innerHTML = board.map(p=>`
