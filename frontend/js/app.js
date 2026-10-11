@@ -360,7 +360,7 @@ async function loadLive(){
     }
 
     if (choice.mode === 'holiday'){
-      badge.textContent='HOLIDAY'; badge.classList.add('off');
+      badge.textContent='Holiday'; badge.classList.add('off');
       slotLine.textContent='No classes today'; heading.textContent='Enjoy your holiday 🎉';
       boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
     }
@@ -371,7 +371,7 @@ async function loadLive(){
   }
 
   if (!DAYS.includes(dayName)){
-    badge.textContent='WEEKEND'; badge.classList.add('off');
+    badge.textContent='Weekend'; badge.classList.add('off');
     slotLine.textContent='No classes today'; heading.textContent="It's the weekend 🎉";
     boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
   }
@@ -387,11 +387,11 @@ async function renderLiveForDay(now, scheduleDay, displayDay){
 
   const idx = currentSlotIndex(now);
   if (idx === -1){
-    badge.textContent='BREAK'; badge.classList.add('off');
+    badge.textContent='Break'; badge.classList.add('off');
     slotLine.textContent='Between periods'; heading.textContent='Break time ☕';
     boardEl.innerHTML=''; busyEl.innerHTML=''; countEl.textContent=''; return;
   }
-  badge.textContent='CLASSES ON'; badge.classList.remove('off');
+  badge.textContent='In session'; badge.classList.remove('off');
   const followNote = scheduleDay !== displayDay
     ? ` <span style="opacity:.65;font-size:.85em;">(following ${scheduleDay}'s timetable)</span>` : '';
   slotLine.innerHTML = `${displayDay} · <b>${SLOTS[idx].label}</b>${followNote}`;
@@ -400,7 +400,7 @@ async function renderLiveForDay(now, scheduleDay, displayDay){
   countEl.textContent = `${data.free.length} / ${data.free.length + data.busy.length} free`;
   heading.textContent = data.free.length ? 'Free right now' : "Nobody's free this period";
   boardEl.innerHTML = data.free.length
-    ? data.free.map((p,i)=>`<div class="flip" style="animation-delay:${i*45}ms"><div class="name">${p.display_name}</div><div class="tag">Free now</div></div>`).join('')
+    ? data.free.map((p,i)=>`<div class="roster-row" style="animation-delay:${i*35}ms"><span class="stamp stamp-free">Free</span><span class="roster-name">${p.display_name}</span></div>`).join('')
     : '<div class="empty-note">No one on your board is free this period.</div>';
   busyEl.innerHTML = data.busy.length
     ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
@@ -533,7 +533,10 @@ function renderPeopleGrid(){
   const el = document.getElementById('peopleGrid');
   el.innerHTML = board.map(p=>`
     <div class="person-card-wrap">
-      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${p.display_name}</button>
+      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">
+        <span class="roster-index">${p.id===me.id?'You':'·'}</span>
+        <span class="roster-name">${p.display_name}</span>
+      </button>
       ${p.id!==me.id ? `
         <div class="person-card-actions">
           <button data-rename="${p.id}" title="Rename for you only">✎</button>
