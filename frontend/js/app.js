@@ -49,7 +49,7 @@ function currentSlotIndex(now){
 
 /* ---------------- boot ---------------- */
 async function boot(){
-  try{ me = await Api.me(); }catch(e){ window.location.href = 'index.html'; return; }
+  try{ me = await Api.me(); }catch(e){ window.location.href = '/'; return; }
   if (!me) return;
 
   await loadMyPeriods(); // before any timetable renders — SLOTS = my own periods
@@ -111,7 +111,7 @@ function renderMeBox(){
       <a href="#" class="logout" id="logoutLink">@${me.username} · log out</a>
     </div>`;
   document.getElementById('logoutLink').onclick = async (e)=>{
-    e.preventDefault(); await Api.logout(); window.location.href='index.html';
+    e.preventDefault(); await Api.logout(); window.location.href='/';
   };
   document.getElementById('editMyNameBtn').onclick = ()=> openEditNameModal();
 }
