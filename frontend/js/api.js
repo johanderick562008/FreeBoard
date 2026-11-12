@@ -11,7 +11,7 @@ async function api(path, options = {}) {
   });
 
   if (res.status === 401) {
-    window.location.href = "index.html";
+    window.location.href = "/";
     return null;
   }
   if (!res.ok) {
