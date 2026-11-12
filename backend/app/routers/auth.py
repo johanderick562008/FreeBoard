@@ -58,7 +58,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         db.refresh(user)
 
     jwt_token = create_access_token(user.id)
-    dest = f"{settings.FRONTEND_ORIGIN}/app.html" + ("?setup=1" if is_new else "")
+    dest = f"{settings.FRONTEND_ORIGIN}/app" + ("?setup=1" if is_new else "")
     resp = RedirectResponse(url=dest)
     set_session_cookie(resp, jwt_token)
     return resp
@@ -66,7 +66,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/logout")
 def logout():
-    resp = RedirectResponse(url=f"{settings.FRONTEND_ORIGIN}/index.html")
+    resp = RedirectResponse(url=f"{settings.FRONTEND_ORIGIN}/")
     clear_session_cookie(resp)
     return resp
 
