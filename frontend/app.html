@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/groups.css">
 </head>
 <body>
 <div class="wrap">
@@ -33,7 +34,8 @@
       <div class="count" id="liveCount"></div>
     </div>
     <h2 class="section-title" id="liveHeading">Free right now</h2>
-    <p class="section-sub">Among you and the people you've added.</p>
+    <p class="section-sub" id="liveScopeText">Among you and the people you've added.</p>
+    <div class="group-bar" data-group-bar hidden></div>
     <div class="board" id="liveBoard"></div>
     <div class="busy-strip">
       <div class="lbl">In class right now</div>
@@ -46,6 +48,7 @@
     <p class="section-sub">Pick a day and slot to see who's free.</p>
     <div class="pillrow" id="browseDays"></div>
     <div class="pillrow" id="browseSlots"></div>
+    <div class="group-bar" data-group-bar hidden></div>
     <div class="split">
       <div class="col free"><h3>✓ Free</h3><div class="chip-row" id="browseFree"></div></div>
       <div class="col busy"><h3>✕ In class</h3><div class="chip-row" id="browseBusy"></div></div>
@@ -66,6 +69,7 @@
       <div class="search-results" id="requestsList"></div>
     </div>
 
+    <div class="group-bar" data-group-bar="edit"></div>
     <div class="people-grid" id="peopleGrid"></div>
 
     <div class="detail" id="personDetail">
@@ -265,6 +269,7 @@
 </script>
 
 <script src="js/api.js"></script>
+<script src="js/groups.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
