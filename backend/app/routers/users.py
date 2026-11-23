@@ -55,7 +55,24 @@ def search_users(request: Request,q: str,db: Session = Depends(get_db),user: Use
         .limit(15)
         .all()
     )
-    return results
+    # Like Instagram's Follow / Requested / Following: tell the app where MY request to
+    # each person stands, so it never offers "Send request" twice.
+    #   "none"      -> never asked, or they declined  -> can send a request
+    #   "requested" -> waiting for them to accept
+    #   "accepted"  -> already on my board
+    mine = {}
+    if results:
+        rows = db.query(Connection).filter(
+            Connection.owner_user_id == user.id,
+            Connection.other_user_id.in_([u.id for u in results]),
+        ).all()
+        mine = {r.other_user_id: r.status for r in rows}
+    status_word = {"pending": "requested", "accepted": "accepted"}
+    return [
+        {"id": u.id, "username": u.username, "display_name": u.display_name, "avatar_url": u.avatar_url,
+         "request_status": status_word.get(mine.get(u.id), "none")}
+        for u in results
+    ]
 
 
 @router.post("/connections/{other_user_id}")
