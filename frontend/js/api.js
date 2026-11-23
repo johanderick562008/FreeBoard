@@ -36,6 +36,7 @@ const Api = {
   searchUsers: (q) => api(`/users/search?q=${encodeURIComponent(q)}`),
   addConnection: (id) => api(`/users/connections/${id}`, { method: "POST" }), // now sends a request, doesn't add instantly
   removeConnection: (id) => api(`/users/connections/${id}`, { method: "DELETE" }),
+  unsendRequest: (id) => api(`/users/connections/${id}/request`, { method: "DELETE" }),
   listConnections: () => api("/users/connections"),
   incomingRequests: () => api("/users/connections/incoming"),
   acceptRequest: (requestId) => api(`/users/connections/requests/${requestId}/accept`, { method: "POST" }),
