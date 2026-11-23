@@ -287,4 +287,6 @@ table.tt td.cell.sel-cell{
 
 /* search results: Requested / Accepted states (Instagram-style) */
 .btn.req-state{cursor:default;opacity:1;color:var(--mint);}
+.btn.req-state.requested{cursor:pointer;}
+.btn.req-state.requested:hover{border-color:var(--busy);color:var(--busy);}
 .btn.req-state.accepted{color:var(--accent);border-color:rgba(95,214,168,.45);}
