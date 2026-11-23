@@ -83,6 +83,7 @@ async function boot(){
     refreshBoard(),
     loadBrowse(),
     loadLive(),
+    loadGroups(),   // groups.js — my private group shortcuts
   ]);
 
   if (boardResult.status === 'rejected'){
@@ -95,6 +96,11 @@ async function boot(){
 
   try{ renderPeopleGrid(); }
   catch(e){ console.error('People grid failed to render', e); }
+
+  // Groups loaded alongside the views above: redraw the group rows with the board's
+  // counts, and if a saved group was active, re-filter Live/Browse with it.
+  renderGroupBars();
+  if (activeGroupId !== null){ loadLive().catch(()=>{}); loadBrowse().catch(()=>{}); }
 
   try{ renderTogetherSelect(); await renderTogetherResults(); }
   catch(e){ console.error('Together tab failed to load', e); }
@@ -239,6 +245,8 @@ function wireRemoveModal(){
     try{
       await Api.removeConnection(removeTargetId);
       board = board.filter(p=>p.id !== removeTargetId);
+      GROUPS.forEach(g=>{ g.member_ids = g.member_ids.filter(id=>id !== removeTargetId); });
+      renderGroupBars();
       if (selectedPersonId === removeTargetId){
         selectedPersonId = null;
         document.getElementById('personDetail').classList.remove('show');
@@ -396,12 +404,12 @@ async function renderLiveForDay(now, scheduleDay, displayDay){
     ? ` <span style="opacity:.65;font-size:.85em;">(following ${scheduleDay}'s timetable)</span>` : '';
   slotLine.innerHTML = `${displayDay} · <b>${SLOTS[idx].label}</b>${followNote}`;
 
-  const data = await Api.live(scheduleDay, idx);
+  const data = groupFilterLive(await Api.live(scheduleDay, idx));
   countEl.textContent = `${data.free.length} / ${data.free.length + data.busy.length} free`;
   heading.textContent = data.free.length ? 'Free right now' : "Nobody's free this period";
   boardEl.innerHTML = data.free.length
     ? data.free.map((p,i)=>`<div class="flip" style="animation-delay:${i*45}ms"><div class="name">${p.display_name}</div><div class="tag">Free now</div></div>`).join('')
-    : '<div class="empty-note">No one on your board is free this period.</div>';
+    : `<div class="empty-note">No one ${groupScopeText()} is free this period.</div>`;
   busyEl.innerHTML = data.busy.length
     ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
     : '<span class="chip free">Nobody — everyone free!</span>';
@@ -458,7 +466,7 @@ function renderBrowseSlotPills(){
   el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ selectedSlot=parseInt(b.dataset.i); renderBrowseSlotPills(); loadBrowse(); });
 }
 async function loadBrowse(){
-  const data = await Api.live(selectedDay, selectedSlot);
+  const data = groupFilterLive(await Api.live(selectedDay, selectedSlot));
   document.getElementById('browseFree').innerHTML = data.free.length
     ? data.free.map(p=>`<span class="chip free">${p.display_name}</span>`).join('')
     : '<span class="chip">Nobody free</span>';
@@ -531,7 +539,7 @@ async function loadIncomingRequests(){
 
 function renderPeopleGrid(){
   const el = document.getElementById('peopleGrid');
-  el.innerHTML = board.map(p=>`
+  el.innerHTML = groupFilterBoard(board).map(p=>`
     <div class="person-card-wrap">
       <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${p.display_name}</button>
       ${p.id!==me.id ? `
