@@ -5,6 +5,9 @@
 // • Live Now, Browse and People each show a row:  All · Hostellers · Cricket team · …
 //   Picking a group shows only the people in it. The choice is shared by the three tabs
 //   and remembered on this device.
+// • Free Together shows the same row: picking a group ticks exactly its members, so you
+//   instantly see when that whole group is free together.
+// • You can put yourself in a group too.
 //
 // Loaded before app.js. app.js calls loadGroups() in boot() and uses groupFilterLive(),
 // groupFilterBoard() and groupScopeText() when it renders.
@@ -67,12 +70,13 @@ function refreshGroupViews(){
 // ---- the "All · group · group" rows ----------------------------------------
 function renderGroupBars(){
   document.querySelectorAll('[data-group-bar]').forEach(bar => {
-    const editable = bar.dataset.groupBar === 'edit';
+    const mode = bar.dataset.groupBar;          // '' = filter, 'edit' = filter + manage, 'pick' = Free Together
+    const editable = mode === 'edit', pick = mode === 'pick';
     if (!GROUPS.length && !editable){ bar.hidden = true; bar.innerHTML = ''; return; }
     bar.hidden = false;
     const others = board.filter(p => me && p.id !== me.id).length;
     const chip = (id, name, count) => {
-      const sel = id === activeGroupId;
+      const sel = pick ? id !== null && sameSet(togetherIdsFor(id), togetherPicked) : id === activeGroupId;
       const edit = editable && id !== null
         ? `<button type="button" class="gchip-edit" data-edit-gid="${id}" title="Edit ${groupEsc(name)}" aria-label="Edit group ${groupEsc(name)}">✎</button>` : '';
       return `<span class="gchip ${sel ? 'sel' : ''}">
@@ -81,13 +85,15 @@ function renderGroupBars(){
         </button>${edit}</span>`;
     };
     bar.innerHTML =
-      `<span class="gbar-label">Show</span>` +
-      chip(null, 'All', others) +
+      `<span class="gbar-label">${pick ? 'Pick' : 'Show'}</span>` +
+      (pick ? '' : chip(null, 'All', others)) +
       GROUPS.map(g => chip(g.id, g.name, g.member_ids.length)).join('') +
       (editable ? `<button type="button" class="gchip-new" data-new-group>+ New group</button>` : '');
 
-    bar.querySelectorAll('.gchip-main').forEach(b => b.onclick = () =>
-      setActiveGroup(b.dataset.gid === '' ? null : parseInt(b.dataset.gid, 10)));
+    bar.querySelectorAll('.gchip-main').forEach(b => b.onclick = () => {
+      const id = b.dataset.gid === '' ? null : parseInt(b.dataset.gid, 10);
+      if (pick) pickGroupForTogether(id); else setActiveGroup(id);
+    });
     bar.querySelectorAll('[data-edit-gid]').forEach(b => b.onclick = () =>
       openGroupModal(GROUPS.find(g => g.id === parseInt(b.dataset.editGid, 10))));
     bar.querySelector('[data-new-group]')?.addEventListener('click', () => openGroupModal(null));
@@ -99,6 +105,19 @@ function renderGroupBars(){
     sub.textContent = g ? `Among ${g.name} (${g.member_ids.length} ${g.member_ids.length === 1 ? 'person' : 'people'}).`
                         : "Among you and the people you've added.";
   }
+}
+
+// ---- Free Together: a group chip ticks exactly that group's members --------
+function sameSet(a, b){ return a.size === b.size && [...a].every(x => b.has(x)); }
+function togetherIdsFor(groupId){
+  const g = GROUPS.find(x => x.id === groupId);
+  const onBoard = new Set(board.map(p => p.id));
+  return new Set(g ? g.member_ids.filter(id => onBoard.has(id)) : []);
+}
+function pickGroupForTogether(groupId){
+  togetherPicked = togetherIdsFor(groupId);
+  renderTogetherSelect();          // also redraws the group rows (highlight)
+  renderTogetherResults();
 }
 
 // ---- create / edit modal ---------------------------------------------------
@@ -165,12 +184,14 @@ function openGroupModal(group){
 
 function renderGroupPeople(){
   const el = document.getElementById('groupPeople');
-  const people = board.filter(p => p.id !== me.id);
+  // me first (as "You"), then everyone on my board
+  const people = [{ id: me.id, username: me.username, display_name: 'You' },
+                  ...board.filter(p => p.id !== me.id)];
   const filterEl = document.getElementById('groupPeopleFilter');
   filterEl.hidden = people.length < 8;
   const q = filterEl.value.trim().toLowerCase();
   const shown = people.filter(p => !q || p.display_name.toLowerCase().includes(q) || (p.username || '').toLowerCase().includes(q));
-  if (!people.length){
+  if (people.length < 2){
     el.innerHTML = '<div class="empty-note">Add people to your board first — then you can put them in groups.</div>';
   } else if (!shown.length){
     el.innerHTML = '<div class="empty-note">No one matches that.</div>';
@@ -201,7 +222,7 @@ async function saveGroup(){
   err.textContent = '';
   if (!name){ err.textContent = 'Give the group a name.'; return; }
   const boardIds = new Set(board.map(p => p.id));
-  const ids = [...groupPicked].filter(id => boardIds.has(id) && id !== me.id);
+  const ids = [...groupPicked].filter(id => boardIds.has(id) || id === me.id);
   if (!ids.length){ err.textContent = 'Pick at least one person.'; return; }
   const clash = GROUPS.find(g => g.name.toLowerCase() === name.toLowerCase() && (!editingGroup || g.id !== editingGroup.id));
   if (clash){ err.textContent = `You already have a group called "${clash.name}".`; return; }
