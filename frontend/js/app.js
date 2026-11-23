@@ -486,19 +486,28 @@ function wirePeople(){
       const results = document.getElementById('searchResults');
       if (q.length < 2){ results.innerHTML=''; return; }
       const users = await Api.searchUsers(q);
+      // Instagram-style: Send request -> Requested (waiting) -> Accepted. Declined = can ask again.
+      const requestButton = (u)=>{
+        if (u.request_status === 'accepted')  return `<button class="btn ghost req-state accepted" disabled>✓ Accepted</button>`;
+        if (u.request_status === 'requested') return `<button class="btn ghost req-state" disabled>Requested</button>`;
+        return `<button class="btn primary" data-id="${u.id}">Send request</button>`;
+      };
       results.innerHTML = users.map(u=>`
         <div class="search-row">
           <span>${u.display_name} <span style="color:var(--mint)">@${u.username}</span></span>
-          <button class="btn primary" data-id="${u.id}">Send request</button>
+          ${requestButton(u)}
         </div>`).join('') || '<div class="empty-note">No matches.</div>';
       results.querySelectorAll('button[data-id]').forEach(btn=>{
         btn.onclick = async ()=>{
-          const res = await Api.addConnection(parseInt(btn.dataset.id));
-          if (res.status === 'accepted'){
-            showToast('Already on your board');
-          } else {
-            btn.textContent = 'Requested'; btn.disabled = true;
-            showToast('Request sent — they need to accept it');
+          btn.disabled = true;
+          try{
+            const res = await Api.addConnection(parseInt(btn.dataset.id));
+            btn.className = 'btn ghost req-state' + (res.status === 'accepted' ? ' accepted' : '');
+            btn.textContent = res.status === 'accepted' ? '✓ Accepted' : 'Requested';
+            showToast(res.status === 'accepted' ? 'Already on your board' : 'Request sent — they need to accept it');
+          }catch(e){
+            btn.disabled = false;
+            showToast(e.message);
           }
         };
       });
