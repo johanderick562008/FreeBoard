@@ -48,16 +48,17 @@ def _list_groups(db: Session, user_id: int) -> list:
     ).fetchall()
     if not groups:
         return []
-    # Only people who are STILL on my board count as members (someone I removed drops out).
+    # Members = me, or people who are STILL on my board (someone I removed drops out).
     members = db.execute(
         text("""
             SELECT m.group_id, m.member_user_id
             FROM board_group_members m
             JOIN board_groups g ON g.id = m.group_id
-            JOIN connections c ON c.owner_user_id = g.owner_user_id
-                              AND c.other_user_id = m.member_user_id
-                              AND c.status = 'accepted'
+            LEFT JOIN connections c ON c.owner_user_id = g.owner_user_id
+                                   AND c.other_user_id = m.member_user_id
+                                   AND c.status = 'accepted'
             WHERE g.owner_user_id = :u
+              AND (c.id IS NOT NULL OR m.member_user_id = g.owner_user_id)
         """),
         {"u": user_id},
     ).fetchall()
@@ -83,7 +84,7 @@ def _clean(db: Session, user_id: int, body: GroupIn, exclude_id: int = None):
     ids = list(dict.fromkeys(body.member_ids))   # remove duplicates, keep order
     if not ids:
         raise HTTPException(422, "Add at least one person to the group.")
-    if not set(ids) <= _board_ids(db, user_id):
+    if not set(ids) <= _board_ids(db, user_id) | {user_id}:   # my board + me
         raise HTTPException(422, "You can only add people who are on your board.")
     existing = db.execute(
         text("SELECT id, name FROM board_groups WHERE owner_user_id = :u"), {"u": user_id}
