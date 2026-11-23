@@ -105,6 +105,20 @@ def remove_connection(other_user_id: int, db: Session = Depends(get_db), user: U
     return {"status": "removed"}
 
 
+@router.delete("/connections/{other_user_id}/request")
+def unsend_request(other_user_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Takes back a request I sent that is still waiting (like Instagram's unsend).
+    Only touches a PENDING request - if they accepted in the meantime, nothing is removed."""
+    row = db.query(Connection).filter_by(owner_user_id=user.id, other_user_id=other_user_id).first()
+    if not row:
+        return {"status": "none"}
+    if row.status != "pending":
+        return {"status": "accepted" if row.status == "accepted" else "none"}
+    db.delete(row)
+    db.commit()
+    return {"status": "none"}
+
+
 @router.get("/connections", response_model=list[ConnectionOut])
 def list_connections(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """My board — only accepted requests, with my private nickname for each person if I set one."""
