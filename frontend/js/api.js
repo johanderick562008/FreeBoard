@@ -47,4 +47,9 @@ const Api = {
   together: (ids) => api(`/schedule/together?user_ids=${ids.join(",")}`),
   getPeriods: (userId) => api(`/settings/periods/${userId}`), // per-user — matches the real backend design
   setPeriods: (slots) => api("/settings/periods", { method: "PUT", body: JSON.stringify({ slots }) }),
+  // Groups (private shortcuts of people on my board)
+  listGroups: () => api("/groups"),
+  createGroup: (name, member_ids) => api("/groups", { method: "POST", body: JSON.stringify({ name, member_ids }) }),
+  updateGroup: (id, name, member_ids) => api(`/groups/${id}`, { method: "PUT", body: JSON.stringify({ name, member_ids }) }),
+  deleteGroup: (id) => api(`/groups/${id}`, { method: "DELETE" }),
 };
