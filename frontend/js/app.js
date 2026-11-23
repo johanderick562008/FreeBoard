@@ -722,6 +722,7 @@ function renderTogetherSelect(){
       renderTogetherSelect(); renderTogetherResults();
     };
   });
+  renderGroupBars();   // groups.js — highlight a group whose members are exactly the ticked people
 }
 async function renderTogetherResults(){
   const el = document.getElementById('togetherResults');
