@@ -65,7 +65,7 @@ async function boot(){
   setInterval(loadLive, 20000);
 
   wireTabs(); wirePeople(); wireBuilderToolbar(); wireUsernameModal();
-  wireNameModal(); wireNicknameModal(); wireRemoveModal(); wireClearTimetableModal(); wireSaturdayModals();
+  wireNameModal(); wireNicknameModal(); wireRemoveModal(); wireUnsendModal(); wireClearTimetableModal(); wireSaturdayModals();
   wireTogetherControls();
 
   const now = new Date();
@@ -489,31 +489,83 @@ function wirePeople(){
       // Instagram-style: Send request -> Requested (waiting) -> Accepted. Declined = can ask again.
       const requestButton = (u)=>{
         if (u.request_status === 'accepted')  return `<button class="btn ghost req-state accepted" disabled>✓ Accepted</button>`;
-        if (u.request_status === 'requested') return `<button class="btn ghost req-state" disabled>Requested</button>`;
-        return `<button class="btn primary" data-id="${u.id}">Send request</button>`;
+        if (u.request_status === 'requested') return requestedButton(u);
+        return sendButton(u);
       };
       results.innerHTML = users.map(u=>`
         <div class="search-row">
           <span>${u.display_name} <span style="color:var(--mint)">@${u.username}</span></span>
           ${requestButton(u)}
         </div>`).join('') || '<div class="empty-note">No matches.</div>';
-      results.querySelectorAll('button[data-id]').forEach(btn=>{
-        btn.onclick = async ()=>{
-          btn.disabled = true;
-          try{
-            const res = await Api.addConnection(parseInt(btn.dataset.id));
-            btn.className = 'btn ghost req-state' + (res.status === 'accepted' ? ' accepted' : '');
-            btn.textContent = res.status === 'accepted' ? '✓ Accepted' : 'Requested';
-            showToast(res.status === 'accepted' ? 'Already on your board' : 'Request sent — they need to accept it');
-          }catch(e){
-            btn.disabled = false;
-            showToast(e.message);
-          }
-        };
-      });
+      results._users = users;
+      wireRequestButtons(results);
     }, 350);
   });
   loadIncomingRequests();
+}
+
+// ---- Send request / Requested (tap to unsend) / Accepted -------------------
+function sendButton(u){ return `<button class="btn primary" data-send="${u.id}">Send request</button>`; }
+function requestedButton(u){
+  return `<button class="btn ghost req-state requested" data-unsend="${u.id}" title="Tap to unsend">Requested</button>`;
+}
+function setRequestButton(btn, u){
+  const html = u.request_status === 'accepted'
+    ? `<button class="btn ghost req-state accepted" disabled>✓ Accepted</button>`
+    : u.request_status === 'requested' ? requestedButton(u) : sendButton(u);
+  btn.outerHTML = html;
+}
+function wireRequestButtons(results){
+  const find = (id)=> (results._users || []).find(u=>u.id===id);
+  results.querySelectorAll('button[data-send]').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const u = find(parseInt(btn.dataset.send));
+      btn.disabled = true;
+      try{
+        const res = await Api.addConnection(u.id);
+        u.request_status = res.status === 'accepted' ? 'accepted' : 'requested';
+        setRequestButton(btn, u); wireRequestButtons(results);
+        showToast(res.status === 'accepted' ? 'Already on your board' : 'Request sent — they need to accept it');
+      }catch(e){ btn.disabled = false; showToast(e.message); }
+    };
+  });
+  results.querySelectorAll('button[data-unsend]').forEach(btn=>{
+    btn.onclick = ()=> openUnsendModal(find(parseInt(btn.dataset.unsend)), results);
+  });
+}
+
+let unsendTarget = null;
+function openUnsendModal(u, results){
+  unsendTarget = { u, results };
+  document.getElementById('unsendText').textContent =
+    `Do you want to unsend your request to ${u.display_name} (@${u.username})? They won't see it any more, and you can send it again later.`;
+  document.getElementById('unsendError').textContent = '';
+  openModalBg('unsendModalBg');
+}
+function wireUnsendModal(){
+  const bg = document.getElementById('unsendModalBg');
+  const confirmBtn = document.getElementById('unsendConfirmBtn');
+  const cancel = ()=> closeModalBg('unsendModalBg');
+  document.getElementById('unsendCancelBtn').onclick = cancel;
+  document.getElementById('unsendCloseBtn').onclick = cancel;
+  bg.addEventListener('click', (e)=>{ if (e.target === bg) cancel(); });
+  confirmBtn.onclick = async ()=>{
+    if (!unsendTarget) return;
+    const { u, results } = unsendTarget;
+    confirmBtn.disabled = true; confirmBtn.textContent = 'Unsending…';
+    try{
+      const res = await Api.unsendRequest(u.id);
+      u.request_status = res.status;                 // 'none', or 'accepted' if they accepted just now
+      const btn = results.querySelector(`button[data-unsend="${u.id}"]`);
+      if (btn){ setRequestButton(btn, u); wireRequestButtons(results); }
+      cancel();
+      showToast(res.status === 'accepted' ? 'They already accepted — nothing to unsend' : 'Request unsent');
+    }catch(e){
+      document.getElementById('unsendError').textContent = e.message;
+    }finally{
+      confirmBtn.disabled = false; confirmBtn.textContent = 'Yes, unsend';
+    }
+  };
 }
 
 async function loadIncomingRequests(){
