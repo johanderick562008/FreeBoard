@@ -290,3 +290,31 @@ table.tt td.cell.sel-cell{
 .btn.req-state.requested{cursor:pointer;}
 .btn.req-state.requested:hover{border-color:var(--busy);color:var(--busy);}
 .btn.req-state.accepted{color:var(--accent);border-color:rgba(95,214,168,.45);}
+
+/* "What's new" — js/whatsnew.js */
+/* margin-bottom comes from nav.tabs; the row just lines the ⓘ up with the tabs */
+.tabs-row{display:flex;align-items:flex-start;gap:10px;}
+.tabs-row > nav.tabs{flex:1;min-width:0;}
+.whatsnew-btn{
+  position:relative;flex:none;margin-top:2px;display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--mint);
+  transition:color .15s ease,border-color .15s ease;
+}
+.whatsnew-btn:hover,.whatsnew-btn:focus-visible{color:var(--free);border-color:var(--free);outline:none;}
+.whatsnew-btn.unseen::after{ /* small dot until the latest updates have been opened */
+  content:"";position:absolute;top:1px;right:1px;width:9px;height:9px;border-radius:50%;
+  background:var(--busy);border:2px solid var(--black);
+}
+.whatsnew-modal{max-width:560px;}
+.wn-item{border-top:1px solid var(--line-soft);padding:16px 0 4px;}
+.wn-head{display:flex;align-items:center;gap:9px;}
+.wn-head h4{margin:0;font-family:var(--font-display);font-size:16px;}
+.wn-tag{font-family:var(--font-mono);font-size:10.5px;font-weight:600;color:var(--black);background:var(--free);border-radius:5px;padding:2px 6px;}
+.wn-intro{margin:8px 0 10px;font-size:13.5px;line-height:1.55;color:var(--paper-dim);}
+.wn-points{display:grid;grid-template-columns:max-content 1fr;gap:8px 14px;margin:0 0 6px;font-size:13px;line-height:1.5;}
+.wn-points dt{font-family:var(--font-mono);font-size:11.5px;color:var(--free);padding-top:2px;}
+.wn-points dd{margin:0;color:var(--paper-dim);}
+@media (max-width:480px){
+  .wn-points{grid-template-columns:1fr;gap:2px;}
+  .wn-points dd{margin-bottom:8px;}
+}
