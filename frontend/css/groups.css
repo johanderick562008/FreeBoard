@@ -1,0 +1,25 @@
+/* Groups ("shortcuts") — js/groups.js */
+.group-bar{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:0 0 16px;}
+.group-bar[hidden]{display:none;}
+.gbar-label{font-family:var(--font-mono);font-size:11px;color:var(--mint);margin-right:2px;}
+.gchip{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:999px;background:var(--panel);overflow:hidden;transition:border-color .15s ease;}
+.gchip:hover{border-color:var(--free);}
+.gchip-main{display:inline-flex;align-items:center;gap:7px;background:none;border:0;color:var(--paper-dim);font-size:13px;font-weight:600;padding:7px 13px;}
+.gchip-n{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--mint);}
+.gchip-edit{background:none;border:0;border-left:1px solid var(--line);color:var(--mint);font-size:12px;padding:0 10px;}
+.gchip-edit:hover{color:var(--paper);background:rgba(255,255,255,.05);}
+.gchip.sel{background:var(--free);border-color:var(--free);}
+.gchip.sel .gchip-main,.gchip.sel .gchip-n,.gchip.sel .gchip-edit{color:var(--black);}
+.gchip.sel .gchip-edit{border-left-color:rgba(16,29,23,.25);}
+.gchip-main:focus-visible,.gchip-edit:focus-visible,.gchip-new:focus-visible{outline:2px solid var(--free);outline-offset:2px;}
+.gchip-new{background:none;border:1px dashed var(--line);border-radius:999px;color:var(--mint);font-size:13px;font-weight:600;padding:7px 13px;}
+.gchip-new:hover{border-color:var(--accent);color:var(--paper);}
+.group-label{display:block;font-family:var(--font-mono);font-size:11.5px;color:var(--mint);margin:14px 0 6px;}
+.group-pick-head{display:flex;align-items:baseline;justify-content:space-between;}
+.group-count{font-family:var(--font-mono);font-size:11.5px;color:var(--free);}
+.group-filter{margin-bottom:10px;}
+.group-filter[hidden]{display:none;}
+.group-people{max-height:40vh;overflow:auto;margin-bottom:6px;}
+.who-chip.on{border-color:var(--free);color:var(--paper);}
+#groupDeleteBtn{margin-right:auto;}
+#groupDeleteBtn[hidden]{display:none;}
