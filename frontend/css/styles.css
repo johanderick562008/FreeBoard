@@ -284,3 +284,7 @@ table.tt td.cell.sel-cell{
 @media (max-width:480px){
   table.tt th, table.tt td{padding:10px 6px;font-size:12.5px;} /* bigger tap targets on mobile */
 }
+
+/* search results: Requested / Accepted states (Instagram-style) */
+.btn.req-state{cursor:default;opacity:1;color:var(--mint);}
+.btn.req-state.accepted{color:var(--accent);border-color:rgba(95,214,168,.45);}
