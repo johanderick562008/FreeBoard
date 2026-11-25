@@ -52,6 +52,10 @@ async function boot(){
   try{ me = await Api.me(); }catch(e){ window.location.href = '/'; return; }
   if (!me) return;
 
+  // New Google account that hasn't picked a username yet: nothing is saved in FreeBoard
+  // until they do, so show only the username step.
+  if (me.pending){ showSignupStep(); return; }
+
   await loadMyPeriods(); // before any timetable renders — SLOTS = my own periods
 
   renderMeBox();
@@ -174,7 +178,7 @@ function closeModalBg(id){
 document.addEventListener('keydown', (e)=>{
   const openBg = document.querySelector('.modal-bg.show');
   if (!openBg) return;
-  if (e.key === 'Escape') openBg.classList.remove('show');
+  if (e.key === 'Escape' && openBg.id !== 'usernameModalBg') openBg.classList.remove('show');   // username step can't be skipped
   if (e.key === 'Enter' && ENTER_SUBMIT_MODALS.includes(openBg.id)){
     const primaryBtn = openBg.querySelector('.btn.primary');
     if (primaryBtn && document.activeElement && document.activeElement.tagName === 'INPUT') primaryBtn.click();
@@ -837,15 +841,51 @@ async function renderTogetherResults(){
 
 /* ---------------- USERNAME SETUP ---------------- */
 function wireUsernameModal(){
-  document.getElementById('usernameSaveBtn').onclick = async ()=>{
-    const val = document.getElementById('usernameInput').value.trim();
+  const input = document.getElementById('usernameInput');
+  const btn = document.getElementById('usernameSaveBtn');
+  const save = async ()=>{
+    const val = input.value.trim();
     const errEl = document.getElementById('usernameError');
+    errEl.textContent = '';
+    if (!val){ errEl.textContent = 'Type a username first.'; return; }
+    btn.disabled = true;
     try{
+      const wasPending = !!me.pending;
       me = await Api.setUsername(val);
+      if (wasPending){ window.location.replace('/app'); return; }   // account just created
       document.getElementById('usernameModalBg').classList.remove('show');
       renderMeBox();
     }catch(e){ errEl.textContent = e.message; }
+    finally{ btn.disabled = false; }
   };
+  btn.onclick = save;
+  input.onkeydown = (e)=>{ if (e.key === 'Enter') save(); };
+}
+
+// Signed in with a Google account that is new to FreeBoard. Until a username is picked,
+// nothing is stored; "Use a different account" just drops the waiting sign-in.
+function showSignupStep(){
+  tickClock(); setInterval(tickClock, 1000);
+  const tabs = document.querySelector('nav.tabs');
+  if (tabs) tabs.style.display = 'none';            // no tabs until the account exists
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const name = String(me.display_name || 'there').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const bg = document.getElementById('usernameModalBg');
+  bg.querySelector('h3').textContent = 'Pick your username';
+  bg.querySelector('.section-sub').innerHTML =
+    `Welcome, ${name}! Choose a username to finish creating your FreeBoard account — friends find you by it. ` +
+    `<b>Nothing is saved until you do.</b>`;
+  if (!document.getElementById('usernameSwitchLink')){
+    bg.querySelector('.modal').insertAdjacentHTML('beforeend',
+      `<button type="button" class="signup-switch" id="usernameSwitchLink">Signed in with the wrong account? Use a different one</button>`);
+    document.getElementById('usernameSwitchLink').onclick = async ()=>{
+      try{ await Api.logout(); }catch(e){}
+      window.location.replace('/');
+    };
+  }
+  wireUsernameModal();
+  bg.classList.add('show');
+  setTimeout(()=> document.getElementById('usernameInput').focus(), 50);
 }
 
 /* ---------------- PERIOD TIMES (editable — different colleges run different bell schedules) ---------------- */
