@@ -46,7 +46,7 @@ def _visible_or_404(db: Session, viewer: User, target_id: int) -> User:
     if target.id == viewer.id or target.privacy == "public":
         return target
     if target.privacy == "connections":
-        linked = db.query(Connection).filter_by(owner_user_id=viewer.id, other_user_id=target.id).first()
+        linked = db.query(Connection).filter_by(owner_user_id=viewer.id, other_user_id=target.id, status="accepted").first()
         if linked:
             return target
     raise HTTPException(status_code=403, detail="This person's timetable is private.")
