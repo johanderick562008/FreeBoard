@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..models import User
-from ..security import create_access_token, set_session_cookie, clear_session_cookie, get_current_user
+from ..security import (create_access_token, set_session_cookie, clear_session_cookie, get_current_user,
+                        decode_token, COOKIE_NAME, create_signup_token, read_signup,
+                        set_signup_cookie, clear_signup_cookie)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -41,26 +43,21 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     email = info["email"]
 
     user = db.query(User).filter(User.google_sub == google_sub).first()
-    is_new = False
-    if not user:
-        is_new = True
-        # temporary placeholder username — user must claim a real one before using the app
-        placeholder = f"user{google_sub[-8:]}"
-        user = User(
-            google_sub=google_sub,
-            email=email,
-            username=placeholder,
-            display_name=info.get("name", email.split("@")[0]),
-            avatar_url=info.get("picture"),
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+    if user:
+        resp = RedirectResponse(url=f"{settings.FRONTEND_ORIGIN}/app")
+        set_session_cookie(resp, create_access_token(user.id))
+        clear_signup_cookie(resp)
+        return resp
 
-    jwt_token = create_access_token(user.id)
-    dest = f"{settings.FRONTEND_ORIGIN}/app" + ("?setup=1" if is_new else "")
-    resp = RedirectResponse(url=dest)
-    set_session_cookie(resp, jwt_token)
+    # New Google account: do NOT create anything in the database yet. Someone who signs
+    # in with the wrong account by mistake and leaves must leave no trace. Their details
+    # wait in a short-lived signed cookie; the account is created only when they pick a
+    # username (POST /users/username). Any other account's session in this browser is
+    # signed out, so the app shows the new account's sign-up and nothing else.
+    resp = RedirectResponse(url=f"{settings.FRONTEND_ORIGIN}/app?setup=1")
+    set_signup_cookie(resp, create_signup_token(
+        google_sub, email, info.get("name") or email.split("@")[0], info.get("picture")))
+    clear_session_cookie(resp)
     return resp
 
 
@@ -71,11 +68,26 @@ def logout():
     # sign-in page.) The app goes to the sign-in page itself afterwards.
     resp = JSONResponse({"status": "logged out"})
     clear_session_cookie(resp)
+    clear_signup_cookie(resp)      # also drops an unfinished sign-up
     return resp
 
 
 @router.get("/me")
-def me(user: User = Depends(get_current_user)):
+def me(request: Request, db: Session = Depends(get_db)):
+    user = None
+    token = request.cookies.get(COOKIE_NAME)
+    if token:
+        try:
+            user = db.query(User).filter(User.id == decode_token(token)).first()
+        except HTTPException:
+            user = None
+    if not user:
+        pending = read_signup(request)
+        if pending:
+            # Signed in with Google, username not chosen yet - nothing is saved so far.
+            return {"pending": True, "display_name": pending.get("name"),
+                    "email": pending.get("email"), "avatar_url": pending.get("pic")}
+        raise HTTPException(status_code=401, detail="Not logged in.")
     return {
         "id": user.id,
         "username": user.username,
