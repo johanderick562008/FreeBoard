@@ -366,3 +366,7 @@ table.tt td.cell.sel-cell{
   .wn-points{grid-template-columns:1fr;gap:2px;}
   .wn-points dd{margin-bottom:8px;}
 }
+
+/* sign-up step: switch account link under the username box */
+.signup-switch{display:block;margin-top:14px;background:none;border:0;padding:0;color:var(--mint);font-size:12.5px;text-decoration:underline;text-underline-offset:3px;}
+.signup-switch:hover{color:var(--paper);}
