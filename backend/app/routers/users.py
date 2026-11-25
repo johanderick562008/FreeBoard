@@ -7,18 +7,31 @@ from slowapi.util import get_remote_address
 from ..database import get_db
 from ..models import User, Connection
 from ..schemas import UserOut, UsernameSetup, DisplayNameUpdate, NicknameUpdate, ConnectionOut
-from ..security import get_current_user
+from ..security import (get_current_user, decode_token, COOKIE_NAME, read_signup,
+                        create_access_token, set_session_cookie, clear_signup_cookie)
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 
 router = APIRouter(prefix="/users", tags=["users"])
 limiter = Limiter(key_func=get_remote_address)
 
 
+def _session_user(request: Request, db: Session):
+    token = request.cookies.get(COOKIE_NAME)
+    if not token:
+        return None
+    try:
+        return db.query(User).filter(User.id == decode_token(token)).first()
+    except HTTPException:
+        return None
+
+
 @router.post("/username", response_model=UserOut)
-def set_username(
-    body: UsernameSetup,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
-):
+def set_username(request: Request, body: UsernameSetup, db: Session = Depends(get_db)):
+    user = _session_user(request, db)
+    if not user:
+        return _finish_signup(request, body, db)
+
     existing = db.query(User).filter(
         User.username == body.username,
         User.id != user.id
@@ -34,6 +47,31 @@ def set_username(
     db.commit()
     db.refresh(user)
     return user
+
+
+def _finish_signup(request: Request, body: UsernameSetup, db: Session):
+    """The ONLY place a new account is created: when a new Google user picks a username."""
+    pending = read_signup(request)
+    if not pending:
+        raise HTTPException(status_code=401, detail="Your sign-in expired. Please continue with Google again.")
+    user = db.query(User).filter(User.google_sub == pending["gsub"]).first()   # e.g. a double tap
+    if not user:
+        if db.query(User).filter(User.username == body.username).first():
+            raise HTTPException(status_code=409, detail="That username is already taken.")
+        user = User(google_sub=pending["gsub"], email=pending["email"], username=body.username,
+                    display_name=(pending.get("name") or body.username)[:100],
+                    avatar_url=pending.get("pic"))
+        db.add(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="That username or Google account is already registered.")
+        db.refresh(user)
+    resp = JSONResponse(UserOut.model_validate(user).model_dump())
+    set_session_cookie(resp, create_access_token(user.id))
+    clear_signup_cookie(resp)
+    return resp
 
 
 @router.patch("/me", response_model=UserOut)
