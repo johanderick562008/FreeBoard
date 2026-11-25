@@ -117,7 +117,14 @@ function renderMeBox(){
       <a href="#" class="logout" id="logoutLink">@${me.username} · log out</a>
     </div>`;
   document.getElementById('logoutLink').onclick = async (e)=>{
-    e.preventDefault(); await Api.logout(); window.location.href='/';
+    e.preventDefault();
+    const link = e.currentTarget;
+    if (link.dataset.busy) return;
+    link.dataset.busy = '1';
+    link.textContent = 'logging out…';
+    // Always end on the sign-in page, even if the network call fails.
+    try{ await Api.logout(); }catch(err){ console.error('Logout request failed', err); }
+    window.location.replace('/');
   };
   document.getElementById('editMyNameBtn').onclick = ()=> openEditNameModal();
 }
