@@ -106,6 +106,42 @@ async function boot(){
   catch(e){ console.error('Together tab failed to load', e); }
 }
 
+// ---- Log out: ask first ------------------------------------------------------
+function openLogoutModal(){
+  if (!document.getElementById('logoutModalBg')){
+    const bg = document.createElement('div');
+    bg.className = 'modal-bg';
+    bg.id = 'logoutModalBg';
+    bg.innerHTML = `
+      <div class="modal" role="dialog" aria-labelledby="logoutTitle">
+        <div class="modal-head">
+          <h3 id="logoutTitle">Log out?</h3>
+          <button class="modal-close" type="button" id="logoutCloseBtn" aria-label="Close">✕</button>
+        </div>
+        <p class="section-sub">You'll need to sign in with Google again to use FreeBoard. Your timetable, people and groups stay saved.</p>
+        <div class="modal-actions">
+          <button class="btn ghost" type="button" id="logoutCancelBtn">No, stay</button>
+          <button class="btn danger" type="button" id="logoutConfirmBtn">Yes, log out</button>
+        </div>
+      </div>`;
+    document.body.appendChild(bg);
+    const cancel = ()=> closeModalBg('logoutModalBg');
+    document.getElementById('logoutCloseBtn').onclick = cancel;
+    document.getElementById('logoutCancelBtn').onclick = cancel;
+    bg.addEventListener('click', (e)=>{ if (e.target === bg) cancel(); });
+    document.getElementById('logoutConfirmBtn').onclick = async ()=>{
+      const btn = document.getElementById('logoutConfirmBtn');
+      if (btn.disabled) return;
+      btn.disabled = true; btn.textContent = 'Logging out…';
+      document.getElementById('logoutCancelBtn').disabled = true;
+      // Always end on the sign-in page, even if the network call fails.
+      try{ await Api.logout(); }catch(err){ console.error('Logout request failed', err); }
+      window.location.replace('/');
+    };
+  }
+  openModalBg('logoutModalBg');
+}
+
 function renderMeBox(){
   document.getElementById('meBox').innerHTML = `
     ${me.avatar_url ? `<img src="${me.avatar_url}" alt="">` : ''}
@@ -116,15 +152,9 @@ function renderMeBox(){
       </div>
       <a href="#" class="logout" id="logoutLink">@${me.username} · log out</a>
     </div>`;
-  document.getElementById('logoutLink').onclick = async (e)=>{
+  document.getElementById('logoutLink').onclick = (e)=>{
     e.preventDefault();
-    const link = e.currentTarget;
-    if (link.dataset.busy) return;
-    link.dataset.busy = '1';
-    link.textContent = 'logging out…';
-    // Always end on the sign-in page, even if the network call fails.
-    try{ await Api.logout(); }catch(err){ console.error('Logout request failed', err); }
-    window.location.replace('/');
+    openLogoutModal();
   };
   document.getElementById('editMyNameBtn').onclick = ()=> openEditNameModal();
 }
