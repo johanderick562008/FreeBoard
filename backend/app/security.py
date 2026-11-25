@@ -54,4 +54,14 @@ def set_session_cookie(response, token: str):
     )
 
 def clear_session_cookie(response):
-    response.delete_cookie(COOKIE_NAME, path="/")
+    # The browser only accepts the "delete" if it carries the SAME attributes the cookie
+    # was set with. Without Secure + SameSite=None, a cross-site browser silently ignored
+    # it in production, so log out did nothing.
+    is_prod = settings.ENV != "development"
+    response.delete_cookie(
+        COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=is_prod,
+        samesite="none" if is_prod else "lax",
+    )
