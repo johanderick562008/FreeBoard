@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from authlib.integrations.starlette_client import OAuth
 from sqlalchemy.orm import Session
 
@@ -66,7 +66,10 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/logout")
 def logout():
-    resp = RedirectResponse(url=f"{settings.FRONTEND_ORIGIN}/")
+    # Called with fetch() from the app, so answer with plain JSON. (A redirect here made
+    # the browser follow it cross-site, fail on CORS, and the app never reached the
+    # sign-in page.) The app goes to the sign-in page itself afterwards.
+    resp = JSONResponse({"status": "logged out"})
     clear_session_cookie(resp)
     return resp
 
