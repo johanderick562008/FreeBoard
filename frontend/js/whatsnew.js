@@ -6,11 +6,21 @@
 // To announce a future update: add an entry at the TOP of UPDATES and change UPDATES_VERSION,
 // so everyone sees the little dot on ⓘ again until they open "What's new".
 (function(){
-  const UPDATES_VERSION = '2026-11-groups';
+  const UPDATES_VERSION = '2026-11-appearance';
   const SEEN_KEY = 'freeboard-seen-updates';
 
   // ------------------------------------------------------------ What's new ---
   const UPDATES = [
+    {
+      tag: 'New', title: 'Appearance — themes, fonts and the Doomsday Edition',
+      intro: 'Make FreeBoard look the way you like. Tap the <b>palette</b> button next to <b>⚙</b> at the top. Your look is only on your device, so your friends keep theirs.',
+      points: [
+        ['Doomsday', 'A special edition with drifting smoke, forged-iron cards, The Warden watching from the background, its own launch screen, and a spark effect every time you tap.'],
+        ['Themes', 'Classic Green, Midnight, Daylight, Sakura Night and Terminal.'],
+        ['Custom', 'Pick your own background and highlight colours.'],
+        ['Font & size', 'Choose Grotesk, Rounded, Serif or Mono, and make text smaller or larger.'],
+      ],
+    },
     {
       tag: 'New', title: 'Groups — your own shortcuts',
       intro: 'Make groups like Hostellers, Class or Cricket team and see just those people. Only you can see your groups.',
@@ -166,6 +176,16 @@
         <div class="ab-pills">${['Tony','Natasha','Bruce'].map(n => `<span class="who-chip on">☑ ${n}</span>`).join('')}<span class="who-chip">☐ Thor</span></div>
         <div class="ab-lbl">Monday</div>
         <div><span class="slotcard">🕒 09:45 – 10:45</span><span class="slotcard">🕒 02:00 – 03:00</span></div>`),
+    },
+    {
+      id: 'appearance', icon: '🎨', title: 'Change the look',
+      text: 'Pick a theme, font and text size. It only changes FreeBoard on the device you’re using.',
+      steps: [
+        'Tap the <b>palette</b> button next to <b>⚙</b> at the top of the page.',
+        'Tap a theme to preview it right away. <b>Doomsday</b> is the special edition, with its own launch screen and tap effect.',
+        'Choose <b>Custom…</b> to pick your own background and highlight colours.',
+        'Pick a font and text size, then tap <b>Apply</b>. <b>Reset</b> brings back Classic Green.',
+      ],
     },
     {
       id: 'privacy', icon: '🔒', title: 'Privacy & account',
