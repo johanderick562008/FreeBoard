@@ -10,6 +10,11 @@ from .models import User
 
 ALGORITHM = "HS256"
 COOKIE_NAME = "freeboard_session"
+# Someone who signed in with Google but hasn't picked a username yet. They are NOT in the
+# database: their Google details wait in this short-lived signed cookie, and the account
+# is only created when they choose a username (POST /users/username).
+SIGNUP_COOKIE = "freeboard_signup"
+SIGNUP_MINUTES = 30
 
 
 def create_access_token(user_id: int) -> str:
@@ -21,6 +26,8 @@ def create_access_token(user_id: int) -> str:
 def decode_token(token: str) -> int:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[ALGORITHM])
+        if payload.get("typ") == "signup":      # a sign-up ticket is never a login
+            raise KeyError("typ")
         return int(payload["sub"])
     except (JWTError, KeyError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired session.")
@@ -65,3 +72,38 @@ def clear_session_cookie(response):
         secure=is_prod,
         samesite="none" if is_prod else "lax",
     )
+
+
+# ---- pending sign-up (Google done, username not chosen yet) -----------------------
+def create_signup_token(google_sub: str, email: str, name: str, picture) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=SIGNUP_MINUTES)
+    payload = {"typ": "signup", "gsub": google_sub, "email": email, "name": name,
+               "pic": picture, "exp": expire}
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=ALGORITHM)
+
+
+def read_signup(request: Request):
+    """The waiting Google details, or None (missing, expired or tampered with)."""
+    token = request.cookies.get(SIGNUP_COOKIE)
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+    if payload.get("typ") != "signup" or not payload.get("gsub") or not payload.get("email"):
+        return None
+    return payload
+
+
+def _cookie_flags():
+    is_prod = settings.ENV != "development"
+    return {"httponly": True, "secure": is_prod, "samesite": "none" if is_prod else "lax", "path": "/"}
+
+
+def set_signup_cookie(response, token: str):
+    response.set_cookie(key=SIGNUP_COOKIE, value=token, max_age=SIGNUP_MINUTES * 60, **_cookie_flags())
+
+
+def clear_signup_cookie(response):
+    response.delete_cookie(SIGNUP_COOKIE, **_cookie_flags())
