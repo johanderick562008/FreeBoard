@@ -178,8 +178,7 @@ def my_network(db: Session = Depends(get_db), user: User = Depends(get_current_u
     There is deliberately no version of this that takes a user id, so nobody can
     see anyone else's lists or counts.
       on_board     - people whose timetable I can see (my accepted rows)
-      can_see_mine - people who can see MY timetable (accepted rows pointing at me)
-    "mutual" = both directions are accepted."""
+      can_see_mine - people who can see MY timetable (accepted rows pointing at me)"""
     mine = db.query(Connection).filter_by(owner_user_id=user.id).all()          # rows I own, any status
     theirs = db.query(Connection).filter_by(other_user_id=user.id, status="accepted").all()
     my_status = {r.other_user_id: r.status for r in mine}
@@ -191,7 +190,7 @@ def my_network(db: Session = Depends(get_db), user: User = Depends(get_current_u
 
     board_out = [
         {"user": UserOut.model_validate(users_by_id[r.other_user_id]).model_dump(),
-         "nickname": r.nickname, "mutual": r.other_user_id in viewers}
+         "nickname": r.nickname}
         for r in on_board if r.other_user_id in users_by_id
     ]
     seeme_out = []
@@ -202,7 +201,6 @@ def my_network(db: Session = Depends(get_db), user: User = Depends(get_current_u
         seeme_out.append({
             "user": UserOut.model_validate(users_by_id[r.owner_user_id]).model_dump(),
             "nickname": my_nick.get(r.owner_user_id),   # my own name for them, if they're on my board
-            "mutual": st == "accepted",
             # what the "Add back" button should show: accepted (no button), requested, or none
             "my_request": "accepted" if st == "accepted" else ("requested" if st == "pending" else "none"),
         })
