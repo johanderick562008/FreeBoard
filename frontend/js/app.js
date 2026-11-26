@@ -840,19 +840,27 @@ async function renderTogetherResults(){
 }
 
 /* ---------------- USERNAME SETUP ---------------- */
+// New accounts: the person types BOTH their display name and username (nothing is copied
+// from their Google account). Existing users who only need a username see just that field.
 function wireUsernameModal(){
   const input = document.getElementById('usernameInput');
+  const nameInput = document.getElementById('displayNameInput');
   const btn = document.getElementById('usernameSaveBtn');
   const save = async ()=>{
+    const signup = !!me.pending;
     const val = input.value.trim();
+    const name = nameInput.value.replace(/\s+/g, ' ').trim();
     const errEl = document.getElementById('usernameError');
     errEl.textContent = '';
-    if (!val){ errEl.textContent = 'Type a username first.'; return; }
+    if (signup && !name){ errEl.textContent = 'Enter your display name.'; nameInput.focus(); return; }
+    if (!val){ errEl.textContent = 'Type a username first.'; input.focus(); return; }
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(val)){
+      errEl.textContent = 'Username must be 3–30 characters: letters, numbers and _ only.'; input.focus(); return;
+    }
     btn.disabled = true;
     try{
-      const wasPending = !!me.pending;
-      me = await Api.setUsername(val);
-      if (wasPending){ window.location.replace('/app'); return; }   // account just created
+      me = await Api.setUsername(val, signup ? name : undefined);
+      if (signup){ window.location.replace('/app'); return; }   // account just created
       document.getElementById('usernameModalBg').classList.remove('show');
       renderMeBox();
     }catch(e){ errEl.textContent = e.message; }
@@ -860,21 +868,25 @@ function wireUsernameModal(){
   };
   btn.onclick = save;
   input.onkeydown = (e)=>{ if (e.key === 'Enter') save(); };
+  nameInput.onkeydown = (e)=>{ if (e.key === 'Enter'){ e.preventDefault(); input.focus(); } };
+  input.oninput = nameInput.oninput = ()=>{ document.getElementById('usernameError').textContent = ''; };
 }
 
-// Signed in with a Google account that is new to FreeBoard. Until a username is picked,
+// Signed in with a Google account that is new to FreeBoard. Until the details are saved,
 // nothing is stored; "Use a different account" just drops the waiting sign-in.
 function showSignupStep(){
   tickClock(); setInterval(tickClock, 1000);
   const tabs = document.querySelector('nav.tabs');
   if (tabs) tabs.style.display = 'none';            // no tabs until the account exists
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const name = String(me.display_name || 'there').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const bg = document.getElementById('usernameModalBg');
-  bg.querySelector('h3').textContent = 'Pick your username';
+  bg.querySelector('h3').textContent = 'Create your FreeBoard profile';
   bg.querySelector('.section-sub').innerHTML =
-    `Welcome, ${name}! Choose a username to finish creating your FreeBoard account — friends find you by it. ` +
-    `<b>Nothing is saved until you do.</b>`;
+    'Choose how friends will see and find you. <b>Nothing is saved until you continue.</b>';
+  document.getElementById('displayNameField').hidden = false;
+  document.getElementById('usernameLabel').hidden = false;
+  document.getElementById('usernameHint').hidden = false;
+  document.getElementById('usernameSaveBtn').textContent = 'Create account';
   if (!document.getElementById('usernameSwitchLink')){
     bg.querySelector('.modal').insertAdjacentHTML('beforeend',
       `<button type="button" class="signup-switch" id="usernameSwitchLink">Signed in with the wrong account? Use a different one</button>`);
@@ -885,7 +897,7 @@ function showSignupStep(){
   }
   wireUsernameModal();
   bg.classList.add('show');
-  setTimeout(()=> document.getElementById('usernameInput').focus(), 50);
+  setTimeout(()=> document.getElementById('displayNameInput').focus(), 50);
 }
 
 /* ---------------- PERIOD TIMES (editable — different colleges run different bell schedules) ---------------- */
