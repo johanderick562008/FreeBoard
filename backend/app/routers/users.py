@@ -50,16 +50,18 @@ def set_username(request: Request, body: UsernameSetup, db: Session = Depends(ge
 
 
 def _finish_signup(request: Request, body: UsernameSetup, db: Session):
-    """The ONLY place a new account is created: when a new Google user picks a username."""
+    """The ONLY place a new account is created: when a new Google user picks a display name and username."""
     pending = read_signup(request)
     if not pending:
         raise HTTPException(status_code=401, detail="Your sign-in expired. Please continue with Google again.")
+    if not body.display_name:
+        raise HTTPException(status_code=422, detail="Enter your display name.")
     user = db.query(User).filter(User.google_sub == pending["gsub"]).first()   # e.g. a double tap
     if not user:
         if db.query(User).filter(User.username == body.username).first():
             raise HTTPException(status_code=409, detail="That username is already taken.")
         user = User(google_sub=pending["gsub"], email=pending["email"], username=body.username,
-                    display_name=(pending.get("name") or body.username)[:100],
+                    display_name=body.display_name,   # typed by the person, not taken from Google
                     avatar_url=pending.get("pic"))
         db.add(user)
         try:
