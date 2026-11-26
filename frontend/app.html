@@ -119,7 +119,16 @@
   <div class="modal">
     <h3>Pick your username</h3>
     <p class="section-sub">This is how your friends will find you to add you to their board.</p>
-    <input class="search-box" id="usernameInput" placeholder="e.g. johan_cse" style="margin-bottom:12px;">
+    <div class="signup-field" id="displayNameField" hidden>
+      <label for="displayNameInput">Display name</label>
+      <input class="search-box" id="displayNameInput" maxlength="100" autocomplete="off" placeholder="e.g. Johan">
+      <small>How your name appears to friends. You can change it later.</small>
+    </div>
+    <div class="signup-field">
+      <label for="usernameInput" id="usernameLabel" hidden>Username</label>
+      <input class="search-box" id="usernameInput" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. johan_cse">
+      <small id="usernameHint" hidden>Friends search this to add you. Letters, numbers and _ only.</small>
+    </div>
     <button class="btn primary" id="usernameSaveBtn">Save &amp; continue</button>
     <div id="usernameError" style="color:var(--busy);font-size:12.5px;margin-top:8px;"></div>
   </div>
