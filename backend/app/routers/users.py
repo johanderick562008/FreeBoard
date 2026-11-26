@@ -172,6 +172,57 @@ def list_connections(db: Session = Depends(get_db), user: User = Depends(get_cur
     ]
 
 
+@router.get("/me/network")
+def my_network(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """My two private lists (like Instagram following / followers), for ME only.
+    There is deliberately no version of this that takes a user id, so nobody can
+    see anyone else's lists or counts.
+      on_board     - people whose timetable I can see (my accepted rows)
+      can_see_mine - people who can see MY timetable (accepted rows pointing at me)
+    "mutual" = both directions are accepted."""
+    mine = db.query(Connection).filter_by(owner_user_id=user.id).all()          # rows I own, any status
+    theirs = db.query(Connection).filter_by(other_user_id=user.id, status="accepted").all()
+    my_status = {r.other_user_id: r.status for r in mine}
+    my_nick = {r.other_user_id: r.nickname for r in mine if r.status == "accepted"}
+    on_board = [r for r in mine if r.status == "accepted"]
+    viewers = {r.owner_user_id for r in theirs}
+    ids = {r.other_user_id for r in on_board} | viewers
+    users_by_id = {u.id: u for u in db.query(User).filter(User.id.in_(ids)).all()} if ids else {}
+
+    board_out = [
+        {"user": UserOut.model_validate(users_by_id[r.other_user_id]).model_dump(),
+         "nickname": r.nickname, "mutual": r.other_user_id in viewers}
+        for r in on_board if r.other_user_id in users_by_id
+    ]
+    seeme_out = []
+    for r in theirs:
+        if r.owner_user_id not in users_by_id:
+            continue
+        st = my_status.get(r.owner_user_id)
+        seeme_out.append({
+            "user": UserOut.model_validate(users_by_id[r.owner_user_id]).model_dump(),
+            "nickname": my_nick.get(r.owner_user_id),   # my own name for them, if they're on my board
+            "mutual": st == "accepted",
+            # what the "Add back" button should show: accepted (no button), requested, or none
+            "my_request": "accepted" if st == "accepted" else ("requested" if st == "pending" else "none"),
+        })
+    by_name = lambda x: (x["nickname"] or x["user"]["display_name"]).lower()
+    board_out.sort(key=by_name)
+    seeme_out.sort(key=by_name)
+    return {"on_board": board_out, "can_see_mine": seeme_out}
+
+
+@router.delete("/me/viewers/{other_user_id}")
+def remove_viewer(other_user_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Stops other_user_id from seeing MY timetable (removes me from their board).
+    They aren't notified; they can send a new request later."""
+    row = db.query(Connection).filter_by(owner_user_id=other_user_id, other_user_id=user.id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return {"status": "removed"}
+
+
 @router.get("/connections/incoming")
 def list_incoming_requests(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Requests other people have sent ME, waiting on my accept/decline."""
