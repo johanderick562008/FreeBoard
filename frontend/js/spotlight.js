@@ -6,6 +6,7 @@
 // Everyone (new and existing users) will see it; old ones they finished never come back.
 (function(){
   const FEATURES = [
+    { id: 'network-2026-11',    target: '#netStats .net-stats', title: 'Your board counts', text: 'Tap to see who’s on your board and who can see yours. Only you see this.' },
     { id: 'appearance-2026-11', target: '#appearanceBtn', title: 'Make it yours', text: 'New themes, fonts and the Doomsday Edition.' },
     { id: 'about-2026-11',      target: '.whatsnew-btn',  title: 'New here?',     text: 'Tap for the guide and what’s new.' },
   ];
