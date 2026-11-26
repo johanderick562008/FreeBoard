@@ -6,11 +6,20 @@
 // To announce a future update: add an entry at the TOP of UPDATES and change UPDATES_VERSION,
 // so everyone sees the little dot on ⓘ again until they open "What's new".
 (function(){
-  const UPDATES_VERSION = '2026-11-appearance';
+  const UPDATES_VERSION = '2026-11-network';
   const SEEN_KEY = 'freeboard-seen-updates';
 
   // ------------------------------------------------------------ What's new ---
   const UPDATES = [
+    {
+      tag: 'New', title: 'Board counts and mutuals',
+      intro: 'Under your name you’ll now see two counts. Tap either one to see the list. <b>Only you can see them</b>, nobody else.',
+      points: [
+        ['On my board', 'People whose timetable you can see. Remove anyone from here.'],
+        ['Can see mine', 'People who can see your timetable. Tap <b>Add back</b> to see theirs too, or <b>Remove</b> to stop them seeing yours. They aren’t told.'],
+        ['Mutual', 'You both see each other’s timetable. Shown with a <b>MUTUAL</b> tag in the lists and on People.'],
+      ],
+    },
     {
       tag: 'New', title: 'Appearance — themes, fonts and the Doomsday Edition',
       intro: 'Make FreeBoard look the way you like. Tap the <b>palette</b> button next to <b>⚙</b> at the top. Your look is only on your device, so your friends keep theirs.',
