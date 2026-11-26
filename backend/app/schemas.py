@@ -17,6 +17,9 @@ class UserOut(BaseModel):
 
 class UsernameSetup(BaseModel):
     username: str
+    # Required when a new account is being created (the person types it — it is never
+    # copied from their Google account). Ignored when an existing user changes username.
+    display_name: Optional[str] = None
 
     @field_validator("username")
     @classmethod
@@ -24,6 +27,18 @@ class UsernameSetup(BaseModel):
         if not USERNAME_RE.match(v):
             raise ValueError("Username must be 3-30 characters: letters, numbers, underscore only.")
         return v.lower()
+
+    @field_validator("display_name")
+    @classmethod
+    def valid_display_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = " ".join(v.split())          # trim and collapse extra spaces
+        if not v:
+            raise ValueError("Enter your display name.")
+        if len(v) > 100:
+            raise ValueError("Display name can be at most 100 characters.")
+        return v
 
 
 class TimetableCell(BaseModel):
