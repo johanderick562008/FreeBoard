@@ -658,7 +658,7 @@ function renderPeopleGrid(){
   const el = document.getElementById('peopleGrid');
   el.innerHTML = groupFilterBoard(board).map(p=>`
     <div class="person-card-wrap">
-      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${escName(p.display_name)}${typeof isMutual === 'function' && p.id!==me.id && isMutual(p.id) ? `<span class="mut-sub">${NET_MUTUAL_ICO}MUTUAL</span>` : ''}</button>
+      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${escName(p.display_name)}</button>
       ${p.id!==me.id ? `
         <div class="person-card-actions">
           <button data-rename="${p.id}" title="Rename for you only">✎</button>
