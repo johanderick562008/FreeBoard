@@ -151,7 +151,7 @@ function renderMeBox(){
     ${me.avatar_url ? `<img src="${me.avatar_url}" alt="">` : ''}
     <div>
       <div class="name">
-        <span id="myNameText">${me.display_name}</span>
+        <span id="myNameText">${escName(me.display_name)}</span>
         <button class="name-edit-btn" id="editMyNameBtn" title="Edit your name">✎</button>
       </div>
       <a href="#" class="logout" id="logoutLink">@${me.username} · log out</a>
@@ -342,6 +342,17 @@ function tickClock(){
     now.toLocaleDateString('en-IN',{weekday:'long', day:'numeric', month:'short'});
 }
 
+// The name to show for someone in Live Now / Browse: the nickname YOU gave them (People →
+// edit name) if there is one, otherwise their own display name. People, Free Together and
+// groups already use this, since they read from `board`.
+function escName(t){
+  return String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function shownName(p){
+  const b = board.find(x => x.id === p.user_id);
+  return escName((b && b.nickname) || p.display_name);
+}
+
 async function refreshBoard(){
   const connections = await Api.listConnections(); // [{id: connectionId, user:{...}, nickname}]
   board = connections.map(c => ({
@@ -449,10 +460,10 @@ async function renderLiveForDay(now, scheduleDay, displayDay){
   countEl.textContent = `${data.free.length} / ${data.free.length + data.busy.length} free`;
   heading.textContent = data.free.length ? 'Free right now' : "Nobody's free this period";
   boardEl.innerHTML = data.free.length
-    ? data.free.map((p,i)=>`<div class="flip" style="animation-delay:${i*45}ms"><div class="name">${p.display_name}</div><div class="tag">Free now</div></div>`).join('')
+    ? data.free.map((p,i)=>`<div class="flip" style="animation-delay:${i*45}ms"><div class="name">${shownName(p)}</div><div class="tag">Free now</div></div>`).join('')
     : `<div class="empty-note">No one ${groupScopeText()} is free this period.</div>`;
   busyEl.innerHTML = data.busy.length
-    ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
+    ? data.busy.map(p=>`<span class="chip">${shownName(p)} — ${p.label}</span>`).join('')
     : '<span class="chip free">Nobody — everyone free!</span>';
 }
 
@@ -509,10 +520,10 @@ function renderBrowseSlotPills(){
 async function loadBrowse(){
   const data = groupFilterLive(await Api.live(selectedDay, selectedSlot));
   document.getElementById('browseFree').innerHTML = data.free.length
-    ? data.free.map(p=>`<span class="chip free">${p.display_name}</span>`).join('')
+    ? data.free.map(p=>`<span class="chip free">${shownName(p)}</span>`).join('')
     : '<span class="chip">Nobody free</span>';
   document.getElementById('browseBusy').innerHTML = data.busy.length
-    ? data.busy.map(p=>`<span class="chip">${p.display_name} — ${p.label}</span>`).join('')
+    ? data.busy.map(p=>`<span class="chip">${shownName(p)} — ${p.label}</span>`).join('')
     : '<span class="chip free">Nobody busy</span>';
 }
 
@@ -535,7 +546,7 @@ function wirePeople(){
       };
       results.innerHTML = users.map(u=>`
         <div class="search-row">
-          <span>${u.display_name} <span style="color:var(--mint)">@${u.username}</span></span>
+          <span>${escName(u.display_name)} <span style="color:var(--mint)">@${u.username}</span></span>
           ${requestButton(u)}
         </div>`).join('') || '<div class="empty-note">No matches.</div>';
       results._users = users;
@@ -617,7 +628,7 @@ async function loadIncomingRequests(){
   block.style.display = '';
   list.innerHTML = requests.map(r=>`
     <div class="search-row">
-      <span>${r.user.display_name} <span style="color:var(--mint)">@${r.user.username}</span> wants to add you</span>
+      <span>${escName(r.user.display_name)} <span style="color:var(--mint)">@${r.user.username}</span> wants to add you</span>
       <span style="display:flex;gap:6px;">
         <button class="btn primary" data-accept="${r.request_id}">Accept</button>
         <button class="btn ghost" data-decline="${r.request_id}">Decline</button>
@@ -643,7 +654,7 @@ function renderPeopleGrid(){
   const el = document.getElementById('peopleGrid');
   el.innerHTML = groupFilterBoard(board).map(p=>`
     <div class="person-card-wrap">
-      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${p.display_name}</button>
+      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${escName(p.display_name)}</button>
       ${p.id!==me.id ? `
         <div class="person-card-actions">
           <button data-rename="${p.id}" title="Rename for you only">✎</button>
@@ -815,7 +826,7 @@ function renderTogetherSelect(){
   const el = document.getElementById('togetherSelect');
   el.innerHTML = board.map(p=>`
     <label class="who-chip ${togetherPicked.has(p.id)?'on':''}">
-      <input type="checkbox" data-id="${p.id}" ${togetherPicked.has(p.id)?'checked':''}> ${p.display_name}
+      <input type="checkbox" data-id="${p.id}" ${togetherPicked.has(p.id)?'checked':''}> ${escName(p.display_name)}
     </label>`).join('');
   el.querySelectorAll('input').forEach(inp=>{
     inp.onchange = ()=>{
