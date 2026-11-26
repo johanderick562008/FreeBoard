@@ -370,3 +370,10 @@ table.tt td.cell.sel-cell{
 /* sign-up step: switch account link under the username box */
 .signup-switch{display:block;margin-top:14px;background:none;border:0;padding:0;color:var(--mint);font-size:12.5px;text-decoration:underline;text-underline-offset:3px;}
 .signup-switch:hover{color:var(--paper);}
+
+/* signup: display name + username fields */
+.signup-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.signup-field label{font-size:13px;font-weight:600;color:var(--paper)}
+.signup-field .search-box{margin:0}
+.signup-field small{font-size:12px;color:var(--mint)}
+.signup-field[hidden],.signup-field [hidden]{display:none}
