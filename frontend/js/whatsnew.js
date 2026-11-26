@@ -12,12 +12,11 @@
   // ------------------------------------------------------------ What's new ---
   const UPDATES = [
     {
-      tag: 'New', title: 'Board counts and mutuals',
+      tag: 'New', title: 'Board counts',
       intro: 'Under your name you’ll now see two counts. Tap either one to see the list. <b>Only you can see them</b>, nobody else.',
       points: [
         ['On my board', 'People whose timetable you can see. Remove anyone from here.'],
         ['Can see mine', 'People who can see your timetable. Tap <b>Add back</b> to see theirs too, or <b>Remove</b> to stop them seeing yours. They aren’t told.'],
-        ['Mutual', 'You both see each other’s timetable. Shown with a <b>MUTUAL</b> tag in your board lists.'],
       ],
     },
     {
