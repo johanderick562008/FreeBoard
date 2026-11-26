@@ -17,7 +17,7 @@
       points: [
         ['On my board', 'People whose timetable you can see. Remove anyone from here.'],
         ['Can see mine', 'People who can see your timetable. Tap <b>Add back</b> to see theirs too, or <b>Remove</b> to stop them seeing yours. They aren’t told.'],
-        ['Mutual', 'You both see each other’s timetable. Shown with a <b>MUTUAL</b> tag in the lists and on People.'],
+        ['Mutual', 'You both see each other’s timetable. Shown with a <b>MUTUAL</b> tag in your board lists.'],
       ],
     },
     {
