@@ -13,7 +13,6 @@ const netEsc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<'
 const netInitials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const netColor = (id) => NET_COLORS[Math.abs(Number(id) || 0) % NET_COLORS.length];
 
-// Used by app.js (People tab) to show the MUTUAL tag.
 function isMutual(userId){
   return NETWORK.on_board.some(x => x.user.id === userId && x.mutual);
 }
@@ -23,7 +22,6 @@ async function loadNetwork(){
     NETWORK = await Api.myNetwork();
   } catch(e) { return; }
   renderNetStats();
-  if (typeof renderPeopleGrid === 'function' && document.getElementById('peopleGrid')) renderPeopleGrid();
   if (document.getElementById('networkModalBg')?.classList.contains('show')) renderNetList();
 }
 
