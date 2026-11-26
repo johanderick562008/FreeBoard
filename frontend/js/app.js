@@ -155,7 +155,9 @@ function renderMeBox(){
         <button class="name-edit-btn" id="editMyNameBtn" title="Edit your name">✎</button>
       </div>
       <a href="#" class="logout" id="logoutLink">@${me.username} · log out</a>
+      <div id="netStats"></div>
     </div>`;
+  if (typeof renderNetStats === 'function') renderNetStats();   // network.js: private board counts
   document.getElementById('logoutLink').onclick = (e)=>{
     e.preventDefault();
     openLogoutModal();
@@ -364,6 +366,7 @@ async function refreshBoard(){
     nickname: c.nickname,
   }));
   board.push({ id: me.id, username: me.username, display_name: me.display_name + ' (you)' });
+  if (typeof loadNetwork === 'function') loadNetwork();   // keep counts + MUTUAL tags in step
 }
 
 /* ---------------- tabs ---------------- */
@@ -639,6 +642,7 @@ async function loadIncomingRequests(){
       await Api.acceptRequest(parseInt(btn.dataset.accept));
       showToast('Request accepted');
       await loadIncomingRequests();
+      if (typeof loadNetwork === 'function') loadNetwork();   // they can now see my timetable
     };
   });
   list.querySelectorAll('button[data-decline]').forEach(btn=>{
@@ -654,7 +658,7 @@ function renderPeopleGrid(){
   const el = document.getElementById('peopleGrid');
   el.innerHTML = groupFilterBoard(board).map(p=>`
     <div class="person-card-wrap">
-      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${escName(p.display_name)}</button>
+      <button class="person-btn ${p.id===selectedPersonId?'sel':''}" data-id="${p.id}">${escName(p.display_name)}${typeof isMutual === 'function' && p.id!==me.id && isMutual(p.id) ? `<span class="mut-sub">${NET_MUTUAL_ICO}MUTUAL</span>` : ''}</button>
       ${p.id!==me.id ? `
         <div class="person-card-actions">
           <button data-rename="${p.id}" title="Rename for you only">✎</button>
