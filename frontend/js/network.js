@@ -4,18 +4,13 @@
 // Counts sit under your name; tapping one opens the list. Nobody else can see your lists
 // (the backend only ever returns the signed-in person's own lists).
 let NETWORK = { on_board: [], can_see_mine: [] };
-let netTab = 'board', netFilter = 'all', netQuery = '';
+let netTab = 'board', netQuery = '';
 const NET_COLORS = ['#ffd23f','#5fd6a8','#ff7a59','#a9c9ae','#c7a6ff','#7aa2ff','#ffb3c8','#f0c27a'];
 const NET_LOCK = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
-const NET_MUTUAL_ICO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h13l-3-3M20 15H7l3 3"/></svg>';
 
 const netEsc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const netInitials = (n) => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const netColor = (id) => NET_COLORS[Math.abs(Number(id) || 0) % NET_COLORS.length];
-
-function isMutual(userId){
-  return NETWORK.on_board.some(x => x.user.id === userId && x.mutual);
-}
 
 async function loadNetwork(){
   try {
@@ -50,7 +45,6 @@ function buildNetModal(){
         <button type="button" role="tab" data-tab="seeme"></button>
       </div>
       <input class="search-box net-search" id="netSearch" placeholder="Search" autocomplete="off">
-      <div class="net-chips" id="netChips"></div>
       <div class="net-privacy">${NET_LOCK}<span>Private. Only you can see these lists and counts. Nobody else, not even people on them.</span></div>
       <div class="net-list" id="netList"></div>
     </div>`;
@@ -58,13 +52,13 @@ function buildNetModal(){
   const close = () => bg.classList.remove('show');
   bg.querySelector('.modal-close').onclick = close;
   bg.addEventListener('click', (e) => { if (e.target === bg) close(); });
-  bg.querySelectorAll('.net-tabs button').forEach(b => b.onclick = () => { netTab = b.dataset.tab; netFilter = 'all'; renderNetList(); });
+  bg.querySelectorAll('.net-tabs button').forEach(b => b.onclick = () => { netTab = b.dataset.tab; renderNetList(); });
   document.getElementById('netSearch').oninput = (e) => { netQuery = e.target.value.trim().toLowerCase(); renderNetList(); };
 }
 
 function openNetwork(tab){
   buildNetModal();
-  netTab = tab; netFilter = 'all'; netQuery = '';
+  netTab = tab; netQuery = '';
   document.getElementById('netSearch').value = '';
   renderNetList();
   document.getElementById('networkModalBg').classList.add('show');
@@ -81,16 +75,7 @@ function renderNetList(){
   tb.classList.toggle('on', netTab === 'board'); tb.setAttribute('aria-selected', netTab === 'board');
   ts.classList.toggle('on', netTab === 'seeme'); ts.setAttribute('aria-selected', netTab === 'seeme');
 
-  const all = netTab === 'board' ? NETWORK.on_board : NETWORK.can_see_mine;
-  const mutual = all.filter(x => x.mutual);
-  const other = all.filter(x => !x.mutual);
-  const otherLabel = netTab === 'board' ? 'Can’t see mine' : 'Not on my board';
-  document.getElementById('netChips').innerHTML = [
-    ['all', 'All', all.length], ['mutual', 'Mutual', mutual.length], ['other', otherLabel, other.length],
-  ].map(([k, l, n]) => `<button type="button" class="net-chip ${netFilter === k ? 'on' : ''}" data-f="${k}">${l}<b>${n}</b></button>`).join('');
-  document.querySelectorAll('#netChips [data-f]').forEach(b => b.onclick = () => { netFilter = b.dataset.f; renderNetList(); });
-
-  let rows = netFilter === 'mutual' ? mutual : netFilter === 'other' ? other : all;
+  let rows = netTab === 'board' ? NETWORK.on_board : NETWORK.can_see_mine;
   if (netQuery) rows = rows.filter(x =>
     [x.nickname, x.user.display_name, x.user.username].some(v => (v || '').toLowerCase().includes(netQuery)));
 
@@ -114,7 +99,7 @@ function renderNetList(){
     }
     return `<div class="net-row">
       <span class="net-av" style="background:${netColor(u.id)}">${netEsc(netInitials(shown))}</span>
-      <div class="net-who"><div class="n"><span>${netEsc(shown)}</span>${x.mutual ? '<span class="net-mut">MUTUAL</span>' : ''}</div><div class="u">${sub}</div></div>
+      <div class="net-who"><div class="n"><span>${netEsc(shown)}</span></div><div class="u">${sub}</div></div>
       <div class="net-acts">${action}</div>
     </div>`;
   }).join('');
