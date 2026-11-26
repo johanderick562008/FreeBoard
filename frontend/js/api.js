@@ -22,7 +22,11 @@ async function api(path, options = {}) {
       500: "Something went wrong. Please try again.",
     };
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || FRIENDLY_STATUS[res.status] || "Something went wrong. Please try again.");
+    // FastAPI validation errors come as a list: show the first message in plain words.
+    const detail = Array.isArray(err.detail)
+      ? String(err.detail[0]?.msg || "").replace(/^Value error,\s*/i, "")
+      : err.detail;
+    throw new Error(detail || FRIENDLY_STATUS[res.status] || "Something went wrong. Please try again.");
   }
   if (res.status === 204) return null;
   return res.json();
@@ -31,7 +35,7 @@ async function api(path, options = {}) {
 const Api = {
   me: () => api("/auth/me"),
   logout: () => fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" }),
-  setUsername: (username) => api("/users/username", { method: "POST", body: JSON.stringify({ username }) }),
+  setUsername: (username, display_name) => api("/users/username", { method: "POST", body: JSON.stringify(display_name ? { username, display_name } : { username }) }),
   updateMyName: (display_name) => api("/users/me", { method: "PATCH", body: JSON.stringify({ display_name }) }),
   searchUsers: (q) => api(`/users/search?q=${encodeURIComponent(q)}`),
   addConnection: (id) => api(`/users/connections/${id}`, { method: "POST" }), // now sends a request, doesn't add instantly
