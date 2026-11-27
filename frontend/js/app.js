@@ -844,6 +844,7 @@ function renderTogetherSelect(){
 async function renderTogetherResults(){
   const el = document.getElementById('togetherResults');
   const picked = Array.from(togetherPicked);
+  if (typeof renderTogetherWeek === 'function') renderTogetherWeek(picked);   // week grid underneath (together-week.js)
   if (picked.length < 2){ el.innerHTML = '<div class="empty-note">Pick at least 2 people above.</div>'; return; }
   const data = await Api.together(picked);
   let html='', any=false;
