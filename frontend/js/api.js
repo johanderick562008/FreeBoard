@@ -53,6 +53,7 @@ const Api = {
   clearTimetable: () => api("/timetable/clear", { method: "DELETE" }),   // "Clear All" (was missing)
   live: (day, slotIndex) => api(`/schedule/live?day=${day}&slot_index=${slotIndex}`),
   together: (ids) => api(`/schedule/together?user_ids=${ids.join(",")}`),
+  togetherWeek: (ids, slots) => api(`/schedule/together/week?user_ids=${ids.join(",")}&slots=${slots}`),
   getPeriods: (userId) => api(`/settings/periods/${userId}`), // per-user — matches the real backend design
   setPeriods: (slots) => api("/settings/periods", { method: "PUT", body: JSON.stringify({ slots }) }),
   // Groups (private shortcuts of people on my board)
