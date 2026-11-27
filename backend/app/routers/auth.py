@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from authlib.integrations.starlette_client import OAuth
 from sqlalchemy.orm import Session
@@ -73,7 +73,7 @@ def logout():
 
 
 @router.get("/me")
-def me(request: Request, db: Session = Depends(get_db)):
+def me(request: Request, response: Response, db: Session = Depends(get_db)):
     user = None
     token = request.cookies.get(COOKIE_NAME)
     if token:
@@ -88,6 +88,10 @@ def me(request: Request, db: Session = Depends(get_db)):
             return {"pending": True, "display_name": pending.get("name"),
                     "email": pending.get("email"), "avatar_url": pending.get("pic")}
         raise HTTPException(status_code=401, detail="Not logged in.")
+    # Sliding session: the app calls /auth/me every time it opens, so renew the login
+    # here. Someone who keeps using FreeBoard is never logged out; the session only ends
+    # when they log out themselves, or after JWT_EXPIRE_MINUTES without opening the app.
+    set_session_cookie(response, create_access_token(user.id))
     return {
         "id": user.id,
         "username": user.username,
