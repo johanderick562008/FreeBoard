@@ -720,6 +720,9 @@ async function renderDetail(){
 
   const toolbar = document.getElementById('builderToolbar');
   toolbar.style.display = isMine ? '' : 'none';
+  if (typeof renderCopyEntry === 'function'){          // copy-timetable.js
+    if (isMine) renderCopyEntry(entries.length); else hideCopyEntry();
+  }
 
   if (isMine){
     // subject suggestions from what's already on the timetable, for the "or select" part
