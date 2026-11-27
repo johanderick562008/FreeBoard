@@ -6,11 +6,19 @@
 // To announce a future update: add an entry at the TOP of UPDATES and change UPDATES_VERSION,
 // so everyone sees the little dot on ⓘ again until they open "What's new".
 (function(){
-  const UPDATES_VERSION = '2026-11-week-grid';
+  const UPDATES_VERSION = '2026-11-copy';
   const SEEN_KEY = 'freeboard-seen-updates';
 
   // ------------------------------------------------------------ What's new ---
   const UPDATES = [
+    {
+      tag: 'New', title: 'Copy a classmate’s timetable',
+      intro: 'Same section, same timetable. Copy a friend’s instead of filling every cell.',
+      points: [
+        ['How', 'Open <b>People</b>, tap your own name, then <b>Copy</b>. Pick a friend, check the preview, and confirm.'],
+        ['After', 'Their classes and period times become yours. Change any cell like before. They aren’t told.'],
+      ],
+    },
     {
       tag: 'New', title: 'Free Together: whole week at a glance',
       intro: 'Under the usual list of times when everyone is free, there’s now a grid of the whole week.',
