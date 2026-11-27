@@ -55,6 +55,8 @@ const Api = {
   together: (ids) => api(`/schedule/together?user_ids=${ids.join(",")}`),
   togetherWeek: (ids, slots) => api(`/schedule/together/week?user_ids=${ids.join(",")}&slots=${slots}`),
   getPeriods: (userId) => api(`/settings/periods/${userId}`), // per-user — matches the real backend design
+  copyCandidates: () => api("/timetable/copy/candidates"),                       // friends I can copy from + how full theirs is
+  copyTimetable: (userId) => api(`/timetable/copy/${userId}`, { method: "POST" }), // replace mine with a copy of theirs
   setPeriods: (slots) => api("/settings/periods", { method: "PUT", body: JSON.stringify({ slots }) }),
   // Groups (private shortcuts of people on my board)
   listGroups: () => api("/groups"),
