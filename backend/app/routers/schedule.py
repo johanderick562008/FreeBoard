@@ -71,3 +71,39 @@ def together(user_ids: str = Query(..., description="comma-separated user ids, m
             if all(status.get(uid, {}).get((d, slot_index), ("", False))[1] for uid in ids):
                 results[d].append(slot_index)
     return results
+
+
+@router.get("/together/week")
+def together_week(user_ids: str = Query(..., description="comma-separated user ids, min 2"),
+                  slots: int = Query(..., ge=1, le=MAX_SLOTS),
+                  db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """The week grid under Free Together: for every day and period, who of the chosen
+    people is free and who is in class (with the class name). Same rules as /together:
+    only people on your own board."""
+    try:
+        ids = [int(x) for x in user_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="user_ids must be comma-separated integers.")
+    ids = list(dict.fromkeys(ids))
+    if len(ids) < 2:
+        raise HTTPException(status_code=400, detail="Pick at least 2 people.")
+
+    board_ids = {p.id for p in _my_board(db, user)}
+    if not set(ids).issubset(board_ids):
+        raise HTTPException(status_code=403, detail="You can only compare people on your own board.")
+
+    status = _status_map(db, ids)
+    week = {}
+    for d in DAYS:
+        row = []
+        for slot_index in range(slots):
+            free, busy = [], []
+            for uid in ids:
+                label, is_free = status.get(uid, {}).get((d, slot_index), ("Not set", False))
+                if is_free:
+                    free.append(uid)
+                else:
+                    busy.append({"user_id": uid, "label": label})
+            row.append({"free": free, "busy": busy})
+        week[d] = row
+    return week
