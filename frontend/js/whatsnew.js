@@ -6,11 +6,19 @@
 // To announce a future update: add an entry at the TOP of UPDATES and change UPDATES_VERSION,
 // so everyone sees the little dot on ⓘ again until they open "What's new".
 (function(){
-  const UPDATES_VERSION = '2026-11-network';
+  const UPDATES_VERSION = '2026-11-week-grid';
   const SEEN_KEY = 'freeboard-seen-updates';
 
   // ------------------------------------------------------------ What's new ---
   const UPDATES = [
+    {
+      tag: 'New', title: 'Free Together: whole week at a glance',
+      intro: 'Under the usual list of times when everyone is free, there’s now a grid of the whole week.',
+      points: [
+        ['Numbers', 'Each box shows how many of the people you picked are free in that period. Brighter means more.'],
+        ['Tap a box', 'See exactly who’s free and who’s in class, and which class.'],
+      ],
+    },
     {
       tag: 'New', title: 'Board counts',
       intro: 'Under your name you’ll now see two counts. Tap either one to see the list. <b>Only you can see them</b>, nobody else.',
